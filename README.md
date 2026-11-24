@@ -98,6 +98,23 @@ OpenStreetMap entry (via Wikimedia Commons, Wikidata or Wikipedia), otherwise ge
 photos taken within 30 m, labelled "Nearby photo". Each photo shows its author and licence and
 links to its Commons page, which the licences require. Tap a photo to view it full screen.
 
+### Foursquare business search (optional)
+
+OpenStreetMap often misses small businesses. With a free Foursquare developer account, search
+also returns Foursquare places (shown first), and place cards fill in missing phone, website and
+address. Only the cheaper "Pro" fields are requested.
+
+1. Create a project at https://foursquare.com/developers and generate a **Service API key**.
+2. Choose how the app gets the key:
+   - **Personal builds:** create `.env.local` (git-ignored) with `VITE_FSQ_KEY=your_key`.
+     The key ends up inside the built app, so don't share those builds.
+   - **Shared builds (recommended):** deploy the proxy in `worker/fsq-proxy.js` to Cloudflare
+     Workers (free) with the key as a secret, then set `VITE_FSQ_PROXY=https://…workers.dev`
+     in `.env.local` and as the `FSQ_PROXY` repository secret for the GitHub APK build.
+3. Rebuild (`npm run build`, or push to GitHub for a new APK).
+
+Without either setting, the app works exactly as before using OpenStreetMap only.
+
 ## Customising the look
 
 - `src/style.js`: all map colours (`COLORS`), road widths, labels, and which POIs show as blips

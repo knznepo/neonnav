@@ -2,7 +2,7 @@
 import maplibregl from 'maplibre-gl';
 import { POI_BLIPS } from './style.js';
 import { blipInfo } from './icons.js';
-import { placeDetails, placePhotos, reverseGeocode } from './api.js';
+import { placeDetails, placePhotos, reverseGeocode, foursquareEnabled, foursquareMatch } from './api.js';
 import { dist, bearing } from './geo.js';
 import { fmtDist, fmtDuration } from './format.js';
 import { isOpenNow } from './hours.js';
@@ -91,11 +91,13 @@ export function openPlace(map, feature, ctx) {
 function loadDetails(name, coord, mySeq) {
   let tags;
   let rev;
-  let pending = 2;
+  let fsq;
+  let pending = foursquareEnabled ? 3 : 2;
   const done = () => {
     pending--;
-    if (mySeq === seq) renderDetails(tags || {}, rev, pending > 0);
+    if (mySeq === seq) renderDetails(tags || {}, rev, pending > 0, fsq);
   };
+  if (foursquareEnabled) foursquareMatch(name, coord).then((r) => (fsq = r), () => {}).finally(done);
   placeDetails(name, coord)
     .then((t) => (tags = t), () => {})
     .finally(() => {
@@ -105,10 +107,12 @@ function loadDetails(name, coord, mySeq) {
   reverseGeocode(coord).then((r) => (rev = r), () => {}).finally(done);
 }
 
-function renderDetails(t, rev, stillLoading) {
+function renderDetails(t, rev, stillLoading, fsq) {
   const rows = [];
   const street = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
-  const address = street ? [street, t['addr:city']].filter(Boolean).join(', ') : rev?.address;
+  const address = street
+    ? [street, t['addr:city']].filter(Boolean).join(', ')
+    : fsq?.location?.formatted_address || rev?.address;
   if (address) rows.push(['pin', address]);
 
   const hours = t.opening_hours;
@@ -122,14 +126,14 @@ function renderDetails(t, rev, stillLoading) {
       badge.hidden = false;
     }
   }
-  const phone = t.phone || t['contact:phone'];
+  const phone = t.phone || t['contact:phone'] || fsq?.tel;
   if (phone) rows.push(['phone', phone]);
-  const web = t.website || t['contact:website'];
+  const web = t.website || t['contact:website'] || fsq?.website;
   if (web) rows.push(['globe', web.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')]);
   const extra = [t.cuisine && titleCase(t.cuisine.replace(/;/g, ', ')), t.brand || t.operator].filter(Boolean).join(' · ');
   if (extra) rows.push(['tag', extra]);
   if (t.wheelchair === 'yes') rows.push(['access', 'Wheelchair accessible']);
-  if (!rows.length && !stillLoading) rows.push(['tag', 'No extra details on OpenStreetMap yet']);
+  if (!rows.length && !stillLoading) rows.push(['tag', 'No extra details found for this place yet']);
 
   const yes = (k) => t[k] && t[k] !== 'no';
   const chips = [
@@ -155,6 +159,7 @@ function renderDetails(t, rev, stillLoading) {
     list.appendChild(li);
   }
   if (stillLoading) list.insertAdjacentHTML('beforeend', '<li class="loading"><span></span></li>');
+  if (fsq && !stillLoading) list.insertAdjacentHTML('beforeend', '<li class="credit">Some details from Foursquare</li>');
   if (phone) {
     $('place-call').href = `tel:${phone.split(';')[0].replace(/\s/g, '')}`;
     $('place-call').hidden = false;

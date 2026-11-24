@@ -5,7 +5,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { buildStyle } from './style.js';
 import { addMissingImage, legendItems } from './icons.js';
-import { searchPlaces, getRoute, reverseGeocode } from './api.js';
+import { searchPlaces, searchFoursquare, mergeResults, getRoute, reverseGeocode } from './api.js';
 import { dist, bearing, cumulative, snap, pointAt, lerpAngle, angleDiff } from './geo.js';
 import { fmtDist, fmtDuration, fmtClock, fmtSpeed, speedUnit, turnAngle } from './format.js';
 import { compassHeading, enableCompass, compassBlocked, setKeepAwake } from './sensors.js';
@@ -153,7 +153,7 @@ let watchId = null;
 let slowTimer = null;
 
 async function startLocation() {
-  $('street').textContent = 'Locating…';
+  $('street-text').textContent = 'Locating…';
   if (!Capacitor.isNativePlatform() && !window.isSecureContext) return useFallback('insecure');
   if (Capacitor.isNativePlatform()) {
     try {
@@ -279,7 +279,7 @@ async function useFallback(reason) {
   state.fallback = true;
   const c = await approximatePosition();
   if (state.lastRealFix) return;
-  $('street').textContent = 'Approximate location';
+  $('street-text').textContent = 'Approximate location';
   onFix(c, 0, 0);
 }
 
@@ -518,12 +518,13 @@ async function runSearch(pickFirst = false) {
   const text = q.value.trim();
   if (!text) return;
   const seq = ++searchSeq;
-  let items;
-  try {
-    items = await searchPlaces(text, state.target || map.getCenter().toArray());
-  } catch {
-    items = null;
-  }
+  const near = state.target || map.getCenter().toArray();
+  // OpenStreetMap (Photon) and Foursquare in parallel; either can fail without breaking search
+  const [osm, fsq] = await Promise.allSettled([searchPlaces(text, near), searchFoursquare(text, near)]);
+  const osmItems = osm.status === 'fulfilled' ? osm.value : [];
+  const fsqItems = fsq.status === 'fulfilled' ? fsq.value : [];
+  let items = mergeResults(fsqItems, osmItems);
+  if (!items.length && osm.status === 'rejected' && fsq.status === 'rejected') items = null;
   if (seq !== searchSeq) return;
   if (pickFirst && items?.length) return choose(items[0]);
   results.innerHTML = '';
@@ -538,6 +539,9 @@ async function runSearch(pickFirst = false) {
     li.lastChild.textContent = it.sub;
     li.onclick = () => choose(it);
     results.appendChild(li);
+  }
+  if (items?.some((it) => it.source === 'foursquare')) {
+    results.insertAdjacentHTML('beforeend', '<li class="r-credit">Business results powered by Foursquare</li>');
   }
   results.hidden = false;
 }
@@ -643,7 +647,7 @@ function updateNav(force = false) {
   $('dest-meta').innerHTML = `<b>${fmtDuration(secs)}</b> · ${fmtDist(remaining)} · ETA ${fmtClock(Date.now() + secs * 1000)}`;
 
   if (state.navigating) {
-    if (state.currentRoad) $('street').textContent = state.currentRoad;
+    if (state.currentRoad) $('street-text').textContent = state.currentRoad;
     $('turn-dist').textContent = fmtDist(Math.max(0, next.along - s.along));
     $('turn-text').textContent = next.text;
     const arrow = $('turn-arrow').firstElementChild;
@@ -754,7 +758,7 @@ function stepSim(dt) {
 // ---------------------------------------------------------------- street name
 async function updateStreet() {
   if (state.navigating && state.currentRoad) {
-    $('street').textContent = state.currentRoad;
+    $('street-text').textContent = state.currentRoad;
     return;
   }
   const now = Date.now();
@@ -764,7 +768,7 @@ async function updateStreet() {
   last.pos = state.target;
   try {
     const r = await reverseGeocode(state.target);
-    if (r?.street && !(state.navigating && state.currentRoad)) $('street').textContent = r.street;
+    if (r?.street && !(state.navigating && state.currentRoad)) $('street-text').textContent = r.street;
   } catch {
     /* offline: keep previous label */
   }

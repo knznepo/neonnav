@@ -211,3 +211,80 @@ function stripHtml(html) {
   const text = new DOMParser().parseFromString(html, 'text/html').body.textContent || '';
   return text.trim().replace(/\s+/g, ' ').slice(0, 80);
 }
+
+// ---------------------------------------------------------------- Foursquare (optional)
+// Adds business search results and fills missing phone/website/address on place cards.
+// Configure ONE of these at build time (see README):
+//   VITE_FSQ_PROXY = URL of your proxy that adds the key (safe for shared builds)
+//   VITE_FSQ_KEY   = Foursquare service key (personal builds only; it ends up inside the app)
+const FSQ_KEY = import.meta.env.VITE_FSQ_KEY;
+const FSQ_PROXY = import.meta.env.VITE_FSQ_PROXY;
+export const foursquareEnabled = Boolean(FSQ_KEY || FSQ_PROXY);
+// "Pro" fields only; hours/rating/photos are pricier "Premium" fields.
+const FSQ_FIELDS = 'fsq_place_id,name,categories,location,latitude,longitude,distance,tel,website';
+
+async function fsq(path, params) {
+  const base = (FSQ_PROXY || 'https://places-api.foursquare.com').replace(/\/$/, '');
+  const u = new URL(base + path);
+  for (const [k, v] of Object.entries(params)) if (v != null) u.searchParams.set(k, v);
+  const headers = { Accept: 'application/json', 'X-Places-Api-Version': '2025-06-17' };
+  if (!FSQ_PROXY) headers.Authorization = `Bearer ${FSQ_KEY}`;
+  const res = await fetch(u, { headers });
+  if (!res.ok) throw new Error(`Foursquare ${res.status}`);
+  return res.json();
+}
+
+function fsqItem(r) {
+  const loc = r.location || {};
+  return {
+    name: r.name,
+    sub: [r.categories?.[0]?.name, loc.formatted_address || [loc.address, loc.locality].filter(Boolean).join(', ')]
+      .filter(Boolean)
+      .join(' · '),
+    coord: [r.longitude, r.latitude],
+    source: 'foursquare',
+    fsq: r,
+  };
+}
+
+export async function searchFoursquare(query, near) {
+  if (!foursquareEnabled || !near) return [];
+  const j = await fsq('/places/search', {
+    query,
+    ll: `${near[1].toFixed(5)},${near[0].toFixed(5)}`,
+    limit: 6,
+    fields: FSQ_FIELDS,
+  });
+  return (j.results || []).filter((r) => Number.isFinite(r.latitude) && Number.isFinite(r.longitude)).map(fsqItem);
+}
+
+/** Best Foursquare match for a named place at a location (or null). */
+export async function foursquareMatch(name, coord) {
+  if (!foursquareEnabled || !name) return null;
+  const j = await fsq('/places/search', {
+    query: name,
+    ll: `${coord[1].toFixed(5)},${coord[0].toFixed(5)}`,
+    radius: 150,
+    limit: 3,
+    fields: FSQ_FIELDS,
+  });
+  const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const want = norm(name);
+  return (j.results || []).find((r) => {
+    const got = norm(r.name);
+    return got && (got.includes(want) || want.includes(got)) && haversine([r.longitude, r.latitude], coord) < 150;
+  }) || null;
+}
+
+/** Foursquare results first (better business coverage), then OSM, without near-duplicates. */
+export function mergeResults(primary, secondary, max = 8) {
+  const out = [];
+  const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const it of [...primary, ...secondary]) {
+    // same name within 250 m = same place (sources often pin a venue at different spots)
+    const dup = out.some((o) => norm(o.name) === norm(it.name) && haversine(o.coord, it.coord) < 250);
+    if (!dup) out.push(it);
+    if (out.length >= max) break;
+  }
+  return out;
+}

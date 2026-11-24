@@ -30,6 +30,10 @@ jobs:
           cache: gradle
 
       - name: Build web app and copy it into the Android project
+        env:
+          # Optional Foursquare business search through your proxy (repo secret FSQ_PROXY).
+          # Never put the raw Foursquare key here: this repo and its APKs are public.
+          VITE_FSQ_PROXY: ${{ secrets.FSQ_PROXY }}
         run: |
           npm ci
           npm run build

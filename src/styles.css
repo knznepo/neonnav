@@ -236,11 +236,18 @@ button.primary {
 #street {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;      /* vertically centred in the pill */
+  justify-content: center;  /* horizontally centred */
   padding: 7px 10px;
   border-radius: 8px;
   font: 600 12px/1.2 Oswald, sans-serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+#street-text {
+  min-width: 0;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -631,3 +638,12 @@ body.nav .sheet-actions .icon-btn { width: 38px; }
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.12);
 }
+
+#results li.r-credit, #place-info li.credit {
+  cursor: default;
+  font-size: 11px;
+  color: var(--dim);
+  padding: 6px 12px 4px;
+}
+#results li.r-credit:hover { background: none; }
+#place-info li.credit { padding: 6px 0 2px; border-top: 0; }
