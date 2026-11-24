@@ -790,7 +790,6 @@ body.searching #wallet { display: none; }
   border-radius: 4px;
   background: rgba(16, 17, 34, 0.85);
 }
-body.mode-drive .wal-add { display: none; }
 /* attribution (i) moves below the balances */
 .maplibregl-ctrl-top-right { top: calc(var(--st) + 150px); }
 
