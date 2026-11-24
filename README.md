@@ -45,6 +45,21 @@ npm run build        # outputs dist/
 Upload `dist/` to any static host (Netlify, Vercel, Cloudflare Pages, GitHub Pages).
 On the phone, open the site, then **Add to Home Screen** (iOS Safari) or **Install app** (Android Chrome).
 
+## Download builds (no tools needed)
+
+GitHub builds both apps on every push (`.github/workflows/build.yml`):
+
+- **Releases** (https://github.com/knznepo/neonnav/releases): direct downloads of the
+  Android `.apk` and iOS `.ipa` for each version tag (`git tag v1.0.1 && git push --tags`).
+- **Actions** tab: the latest build's files for every push (sign in to GitHub to download).
+
+Install the `.ipa` on an iPhone with [Sideloadly](https://sideloadly.io) or
+[AltStore](https://altstore.io) and your Apple ID (free accounts: re-sign every 7 days).
+
+Android updates install over the previous version only when the `ANDROID_KEYSTORE_B64` and
+`ANDROID_KEYSTORE_PASSWORD` repository secrets are set (see `keystore/`, kept out of git;
+back it up). Without them, builds use a throwaway key and need an uninstall before updating.
+
 ## Android
 
 Requires [Android Studio](https://developer.android.com/studio).

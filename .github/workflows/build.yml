@@ -1,0 +1,128 @@
+# Builds installable apps in the cloud.
+#   Push to main / "Run workflow": Android APK + iOS IPA attached to the run as artifacts.
+#   Push a tag like v1.0.0:        also publishes a GitHub Release with both files (direct download links).
+name: Build apps
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to publish releases on tags
+
+env:
+  VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('1.0.{0}', github.run_number) }}
+  # Optional Foursquare proxy override (repo secret). Never put the raw Foursquare key here.
+  VITE_FSQ_PROXY: ${{ secrets.FSQ_PROXY }}
+
+jobs:
+  web:
+    name: Web build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Build
+        run: |
+          # an empty secret would switch Foursquare off; only pass it when set
+          [ -z "$VITE_FSQ_PROXY" ] && unset VITE_FSQ_PROXY
+          npm run build
+      - uses: actions/upload-artifact@v4
+        with: { name: web-dist, path: dist }
+
+  android:
+    name: Android APK
+    needs: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: gradle } # Java 21 required by Capacitor 7
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with: { name: web-dist, path: dist }
+      - run: npx cap sync android
+
+      - name: Build APK
+        working-directory: android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          APP_VERSION_CODE: ${{ github.run_number }}
+          APP_VERSION_NAME: ${{ env.VERSION_NAME }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            # signed release with the permanent key, so installed apps can be updated in place
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/neonnav.p12"
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/neonnav.p12"
+            ./gradlew assembleRelease --no-daemon
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/NeonNav.apk"
+          else
+            echo "::warning::ANDROID_KEYSTORE_B64 secret not set: using a throwaway debug key (installed copies can't be updated in place)"
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/NeonNav.apk"
+          fi
+          mkdir -p ../out && cp "$RUNNER_TEMP/NeonNav.apk" "../out/NeonNav-${VERSION_NAME}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with: { name: NeonNav-android, path: out/*.apk }
+
+  ios:
+    name: iOS IPA (unsigned)
+    needs: web
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with: { name: web-dist, path: dist }
+      - name: Sync iOS project (installs CocoaPods dependencies)
+        run: npx cap sync ios
+
+      - name: Archive (no signing; Sideloadly/AltStore sign it with your Apple ID)
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="${VERSION_NAME#v}" CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            archive | { if command -v xcbeautify >/dev/null; then xcbeautify; else cat; fi; }
+
+      - name: Package .ipa
+        run: |
+          cd "$RUNNER_TEMP"
+          mkdir -p Payload
+          cp -R App.xcarchive/Products/Applications/App.app Payload/
+          zip -qry "NeonNav-${VERSION_NAME}.ipa" Payload
+          mkdir -p "$GITHUB_WORKSPACE/out" && mv NeonNav-*.ipa "$GITHUB_WORKSPACE/out/"
+
+      - uses: actions/upload-artifact@v4
+        with: { name: NeonNav-ios, path: out/*.ipa }
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: NeonNav-*, path: out, merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            **Android:** download `NeonNav-*.apk` on your phone and open it (allow installing from your browser when asked).
+
+            **iPhone:** download `NeonNav-*.ipa` on a computer and install it with [Sideloadly](https://sideloadly.io) or [AltStore](https://altstore.io) using your Apple ID. With a free Apple ID the app must be re-signed every 7 days (AltStore can do this automatically).
+
+            Or skip installing: open the web version in your phone's browser and use *Add to Home Screen*.
