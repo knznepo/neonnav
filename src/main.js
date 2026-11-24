@@ -4,12 +4,16 @@ import './styles.css';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { buildStyle, COLORS } from './style.js';
-import { addMissingImage, legendItems } from './icons.js';
+import { addMissingImage, legendItems, blipInfo, PIN_SIZE } from './icons.js';
 import { searchPlaces, searchFoursquare, mergeResults, getRoute, reverseGeocode } from './api.js';
 import { dist, bearing, cumulative, snap, pointAt, lerpAngle, angleDiff } from './geo.js';
-import { fmtDist, fmtDuration, fmtClock, fmtSpeed, speedUnit, turnAngle } from './format.js';
+import { fmtDist, fmtDuration, fmtClock, fmtSpeed, speedUnit, turnAngle, IMPERIAL } from './format.js';
 import { compassHeading, enableCompass, compassBlocked, setKeepAwake } from './sensors.js';
 import { openPlace, closePlace, placeOpen } from './place.js';
+import { initQuickFind, closeQuickFind, quickFindOpen, setQuickFindVisible } from './quickfind.js';
+import { getSaved, onSavedChange, getRecents, addRecent } from './saved.js';
+import { speak, stop as stopSpeech, isMuted, setMuted, spokenDistance } from './voice.js';
+import { routeLimits, limitAt, trackLimit } from './speedlimit.js';
 
 // Native GPS that keeps running with the screen off / app in background (used while navigating).
 const BgGeo = registerPlugin('BackgroundGeolocation');
@@ -265,6 +269,7 @@ function handlePosition(p) {
     h = compassHeading() ?? travelBearing;
   }
   state.lastRealFix = { coord: c, heading: h, time };
+  trackSpeedLimit(c);
   saveLastPos(c);
   if (state.fallback) {
     state.fallback = false;
@@ -369,6 +374,42 @@ function render(now) {
   }
   updateRadarOverlay();
   $('speed-val').textContent = fmtSpeed(state.speed);
+  updateLimit(now);
+}
+
+// Speed limit sign: from the route's profile while navigating, otherwise from a periodic lookup
+// of the road you're on. Hidden where OpenStreetMap has no limit.
+function updateLimit(now) {
+  // compare speed every frame; look the limit up at most once a second
+  if (state.limitVal) $('speed').classList.toggle('over', fmtSpeed(state.speed) > state.limitVal + (IMPERIAL ? 3 : 5));
+  if (now - (state.lastLimitAt || 0) < 1000) return;
+  state.lastLimitAt = now;
+  let kmh = null;
+  if (state.route?.limits) kmh = limitAt(state.route.limits, state.target);
+  else if (state.freeLimit && Date.now() - state.freeLimit.t < 45000 && dist(state.freeLimit.pos, state.target) < 500) kmh = state.freeLimit.kmh;
+  const sign = $('limit');
+  if (!kmh) {
+    state.limitVal = null;
+    sign.hidden = true;
+    $('speed').classList.remove('over');
+    return;
+  }
+  const limit = IMPERIAL ? Math.round(kmh / 1.609344 / 5) * 5 : Math.round(kmh);
+  state.limitVal = limit;
+  $('limit-val').textContent = limit;
+  sign.hidden = false;
+}
+
+function trackSpeedLimit(coord) {
+  const t = (state.track ||= []);
+  if (!t.length || dist(t[t.length - 1], coord) > 10) t.push(coord);
+  if (t.length > 8) t.shift();
+  if (state.route || state.speed < 4 || t.length < 3) return;
+  if (Date.now() - (state.lastFreeLookup || 0) < 15000) return;
+  state.lastFreeLookup = Date.now();
+  trackLimit(t.slice(-6))
+    .then((kmh) => (state.freeLimit = { kmh, t: Date.now(), pos: coord }))
+    .catch(() => {});
 }
 
 function updateRadarOverlay() {
@@ -476,21 +517,74 @@ map.on('click', (e) => {
   const poi = pickPoi(e.point);
   if (poi) return showPlace(poi);
   if (placeOpen()) return closePlace();
+  if (quickFindOpen()) return closeQuickFind();
   if (state.mode === 'map') setDestination([e.lngLat.lng, e.lngLat.lat]);
 });
 map.on('mouseenter', 'poi-blips', () => (map.getCanvas().style.cursor = 'pointer'));
 map.on('mouseleave', 'poi-blips', () => (map.getCanvas().style.cursor = ''));
 
 function showPlace(feature) {
+  // the quick-find list hides behind the card and comes back when the card closes
+  if (quickFindOpen()) setQuickFindVisible(false);
   openPlace(map, feature, {
     from: state.target,
-    heading: map.getBearing(), // direction arrow is relative to the screen
+    heading: map.getBearing(),
     onWaypoint: (coord, name) => setDestination(coord, name, true),
     onGo: async (coord, name) => {
       if (await setDestination(coord, name, true)) startNav();
     },
+    onSaved: (msg) => toast(msg, 2000),
+    onClose: () => quickFindOpen() && setQuickFindVisible(true),
   });
 }
+
+/** Open the details card for a list item (quick find, saved place, recent search). */
+function openItem(item) {
+  showPlace({
+    properties: { name: item.name, class: item.cls || null, blip: item.blip, catLabel: item.fsq?.categories?.[0]?.name },
+    geometry: { coordinates: item.coord },
+  });
+  map.easeTo({ center: item.coord, duration: 600 });
+}
+
+// ---------------------------------------------------------------- quick find + saved places
+initQuickFind(map, {
+  getPos: () => state.target,
+  openItem,
+  showArea: (coords) => {
+    if (state.mode === 'drive') enterMap();
+    const b = new maplibregl.LngLatBounds();
+    coords.forEach((c) => b.extend(c));
+    const panel = Math.round(window.innerHeight * 0.45);
+    map.fitBounds(b, { padding: { top: 100, bottom: panel, left: 80, right: 40 }, maxZoom: 16, pitch: 0, bearing: 0, duration: 800 });
+  },
+});
+
+let savedPins = [];
+function renderSavedPins() {
+  savedPins.forEach((m) => m.remove());
+  savedPins = [];
+  const s = getSaved();
+  const all = [
+    s.home && { ...s.home, blip: 'blip-home' },
+    s.work && { ...s.work, blip: 'blip-work' },
+    ...s.favorites.map((f) => ({ ...f, blip: 'blip-fav' })),
+  ].filter(Boolean);
+  for (const p of all) {
+    const img = document.createElement('img');
+    img.src = blipInfo(p.blip).url;
+    img.className = 'qf-pin';
+    img.style.width = `${PIN_SIZE.width * 0.8}px`;
+    img.style.height = `${PIN_SIZE.height * 0.8}px`;
+    img.onclick = (e) => {
+      e.stopPropagation();
+      openItem(p);
+    };
+    savedPins.push(new maplibregl.Marker({ element: img, anchor: 'bottom' }).setLngLat(p.coord).addTo(map));
+  }
+}
+onSavedChange(renderSavedPins);
+renderSavedPins();
 map.on('contextmenu', (e) => setDestination([e.lngLat.lng, e.lngLat.lat]));
 
 let lp = null;
@@ -517,9 +611,36 @@ let searchSeq = 0;
 q.addEventListener('input', () => {
   $('q-clear').hidden = !q.value;
   clearTimeout(searchTimer);
+  if (!q.value.trim()) return showSuggestions();
   if (q.value.trim().length < 3) return (results.hidden = true);
   searchTimer = setTimeout(runSearch, 350);
 });
+q.addEventListener('focus', () => !q.value.trim() && showSuggestions());
+q.addEventListener('blur', () => setTimeout(() => !q.value.trim() && (results.hidden = true), 200));
+
+// Empty search box: one-tap Home / Work / favorites and recent searches
+function showSuggestions() {
+  const s = getSaved();
+  const rows = [
+    s.home && { ...s.home, label: 'Home', blip: 'blip-home' },
+    s.work && { ...s.work, label: 'Work', blip: 'blip-work' },
+    ...s.favorites.slice(0, 3).map((f) => ({ ...f, label: 'Favorite', blip: 'blip-fav' })),
+    ...getRecents().slice(0, 5).map((r) => ({ ...r, label: r.sub || 'Recent' })),
+  ].filter(Boolean);
+  results.innerHTML = '';
+  if (!rows.length) return (results.hidden = true);
+  for (const it of rows) {
+    const li = document.createElement('li');
+    li.className = 'r-suggest';
+    li.innerHTML = `${it.blip ? `<img src="${blipInfo(it.blip).url}" alt="">` : '<i class="r-clock">↺</i>'}<div><div class="r-name"></div><div class="r-sub"></div></div>`;
+    li.querySelector('.r-name').textContent = it.name;
+    li.querySelector('.r-sub').textContent = it.label;
+    li.onmousedown = (e) => e.preventDefault(); // keep focus so blur doesn't hide the list first
+    li.onclick = () => choose(it);
+    results.appendChild(li);
+  }
+  results.hidden = false;
+}
 q.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     clearTimeout(searchTimer);
@@ -569,6 +690,7 @@ function choose(item) {
   results.hidden = true;
   q.value = item.name;
   q.blur();
+  addRecent(item);
   setDestination(item.coord, item.name);
 }
 
@@ -625,8 +747,14 @@ async function computeRoute(isReroute = false) {
     state.route = r;
     state.offRouteCount = 0;
     setRouteLine(r.coords);
+    r.limits = null;
+    routeLimits(r.coords).then((p) => state.route === r && (r.limits = p)).catch(() => {});
+    state.voice = null;
     updateNav(true);
-    if (isReroute) toast('Rerouting…', 1500);
+    if (isReroute) {
+      toast('Rerouting…', 1500);
+      speak('Route updated.');
+    }
     return true;
   } catch (e) {
     if (!isReroute) $('dest-meta').textContent = e.message || 'No route found';
@@ -666,6 +794,7 @@ function updateNav(force = false) {
   $('dest-meta').innerHTML = `<b>${fmtDuration(secs)}</b> · ${fmtDist(remaining)} · ETA ${fmtClock(Date.now() + secs * 1000)}`;
 
   if (state.navigating) {
+    announce(next, next.along - s.along);
     if (state.currentRoad) $('street-text').textContent = state.currentRoad;
     $('turn-dist').textContent = fmtDist(Math.max(0, next.along - s.along));
     $('turn-text').textContent = next.text;
@@ -676,6 +805,36 @@ function updateNav(force = false) {
       r.remaining = [s.point, ...r.coords.slice(s.index + 1)];
       setRouteLine(r.remaining);
     }
+  }
+}
+
+// Spoken prompts: early warning, a closer reminder, then "now". Distances scale with speed.
+function announce(step, d) {
+  const spd = state.speed;
+  const far = spd > 22 ? 1500 : spd > 12 ? 600 : 300;
+  const mid = spd > 12 ? 250 : 120;
+  const now = Math.max(25, spd * 2.5);
+  const lower = step.text.charAt(0).toLowerCase() + step.text.slice(1);
+  if (!state.voice || state.voice.step !== step) {
+    const followsAnother = !!state.voice;
+    state.voice = { step, said: new Set() };
+    // the next turn comes right after the one just made: announce it straight away
+    if (followsAnother && d <= mid && d > now) {
+      state.voice.said.add('far').add('mid');
+      speak(`Then ${lower}.`);
+      return;
+    }
+  }
+  const v = state.voice;
+  if (d <= now && !v.said.has('now') && step.type !== 'arrive') {
+    v.said.add('now').add('mid').add('far');
+    speak(step.text + '.');
+  } else if (d <= mid && d > now && !v.said.has('mid')) {
+    v.said.add('mid').add('far');
+    speak(`In ${spokenDistance(fmtDist(d))}, ${lower}.`);
+  } else if (d <= far && d > mid + 50 && !v.said.has('far')) {
+    v.said.add('far');
+    speak(`In ${spokenDistance(fmtDist(d))}, ${lower}.`);
   }
 }
 
@@ -690,12 +849,17 @@ function startNav() {
   results.hidden = true;
   $('turn').hidden = false;
   $('btn-go').hidden = true;
+  $('btn-voice').hidden = false;
+  state.voice = null;
+  const r = state.route;
+  speak(`Starting route to ${state.dest?.name || 'your destination'}. About ${fmtDuration(r.duration)}.`);
   updateNav(true);
   enterDrive();
 }
 
 function arrive() {
   toast(`You have arrived at ${state.dest?.name || 'your destination'}`, 4000);
+  speak(`You have arrived at ${state.dest?.name || 'your destination'}.`);
   clearRoute();
 }
 
@@ -709,6 +873,8 @@ function clearRoute() {
   updateAwake();
   state.nextStepAlong = Infinity;
   state.currentRoad = '';
+  state.voice = null;
+  $('btn-voice').hidden = true;
   destMarkers.forEach((mk) => mk.remove());
   setRouteLine(null);
   $('sheet').hidden = true;
@@ -734,6 +900,14 @@ function showSheet() {
   $('turn').hidden = true;
   $('search').hidden = false;
 }
+
+$('btn-voice').classList.toggle('muted', isMuted());
+$('btn-voice').onclick = () => {
+  setMuted(!isMuted());
+  $('btn-voice').classList.toggle('muted', isMuted());
+  toast(isMuted() ? 'Voice guidance off' : 'Voice guidance on', 1500);
+  if (!isMuted()) speak('Voice guidance on.');
+};
 
 $('btn-go').onclick = startNav;
 $('btn-cancel').onclick = clearRoute;

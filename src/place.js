@@ -1,11 +1,11 @@
 // Place details card shown when a map blip is tapped.
-import maplibregl from 'maplibre-gl';
 import { POI_BLIPS } from './style.js';
 import { blipInfo } from './icons.js';
 import { placeDetails, placePhotos, reverseGeocode, foursquareEnabled, foursquareMatch } from './api.js';
 import { dist, bearing } from './geo.js';
 import { fmtDist, fmtDuration } from './format.js';
 import { isOpenNow } from './hours.js';
+import { savePlace, removePlace, savedKinds } from './saved.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -15,7 +15,7 @@ const NICE = {
   attraction: 'Attraction', parking: 'Parking',
 };
 const titleCase = (s) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const COMPASS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
 
 const ICONS = {
   pin: '<path d="M12 22s7-7.5 7-12.5a7 7 0 0 0-14 0C5 14.5 12 22 12 22zm0-10a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>',
@@ -29,7 +29,6 @@ const svg = (name) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="cur
 
 let current = null;
 let seq = 0;
-let ring = null;
 
 /**
  * @param map       main MapLibre map (for the selection ring)
@@ -39,51 +38,43 @@ let ring = null;
 export function openPlace(map, feature, ctx) {
   const p = feature.properties;
   const coord = feature.geometry.coordinates.slice(0, 2);
-  const blipId = POI_BLIPS[p.class];
+  const blipId = p.blip || POI_BLIPS[p.class];
   const info = blipInfo(blipId) || { url: '', color: '#d63cff', label: 'Place' };
   const name = p['name:latin'] || p.name || NICE[p.subclass] || titleCase(p.subclass || p.class || 'Place');
-  const category = NICE[p.subclass] || NICE[p.class] || titleCase(p.subclass || p.class || info.label);
-  current = { coord, name, ctx };
+  const category = p.catLabel || NICE[p.subclass] || NICE[p.class] || titleCase(p.subclass || p.class || info.label);
+  current = { coord, name, cls: p.class || null, ctx, photos: [] };
   const mySeq = ++seq;
 
   const card = $('place');
   card.style.setProperty('--cat', info.color);
-  $('place-icon').src = info.url;
+  const avatar = $('place-avatar-img');
+  avatar.src = info.url;
+  avatar.className = 'is-icon';
+  $('place-photo-count').hidden = true;
+  $('place-photo-credit').hidden = true;
   $('place-cat').textContent = category;
   $('place-name').textContent = name;
   $('place-badge').hidden = true;
 
-  // quick stats from straight-line distance
+  // one-line description, e.g. "0.4 mi northeast of you · about 2 min by car"
   if (ctx.from) {
     const d = dist(ctx.from, coord);
-    const b = bearing(ctx.from, coord);
-    $('place-dist').textContent = fmtDist(d);
-    const rel = (b - (ctx.heading || 0) + 360) % 360; // relative to screen-up
-    $('place-dir').innerHTML =
-      `<svg viewBox="0 0 24 24" width="16" height="16"><path transform="rotate(${rel.toFixed(0)} 12 12)" d="M12 2 20 21 12 16.5 4 21z" fill="#ffcc00"/></svg>` +
-      COMPASS[Math.round(b / 45) % 8];
+    const dir = COMPASS[Math.round(bearing(ctx.from, coord) / 45) % 8];
     // rough city-driving estimate: roads ~35% longer than straight line, ~40 km/h average
-    $('place-time').textContent = `≈${fmtDuration((d * 1.35) / 11)}`;
+    $('place-desc').textContent = `${fmtDist(d)} ${dir} of you · about ${fmtDuration((d * 1.35) / 11)} by car`;
   } else {
-    $('place-dist').textContent = $('place-dir').textContent = $('place-time').textContent = '—';
+    $('place-desc').textContent = category;
   }
 
   $('place-info').innerHTML = '<li class="loading"><span></span><span></span></li>';
   $('place-chips').hidden = true;
-  $('place-photos').hidden = true;
-  $('place-photos').querySelector('.pp-track').innerHTML = '';
   $('place-call').hidden = true;
   $('place-web').hidden = true;
+  $('place-save').hidden = true;
+  refreshSaved();
   card.hidden = false;
   card.classList.remove('show');
   requestAnimationFrame(() => card.classList.add('show'));
-
-  ring?.remove();
-  const el = document.createElement('div');
-  el.className = 'select-ring';
-  el.style.setProperty('--cat', info.color);
-  el.innerHTML = '<span></span>';
-  ring = new maplibregl.Marker({ element: el }).setLngLat(coord).addTo(map);
 
   loadDetails(p.name, coord, mySeq);
 }
@@ -178,41 +169,36 @@ function renderDetails(t, rev, stillLoading, fsq) {
 // ---------------------------------------------------------------- photos
 async function loadPhotos(tags, coord, mySeq) {
   const { photos, nearby } = await placePhotos(tags, coord).catch(() => ({ photos: [] }));
-  if (mySeq !== seq || !photos.length) return;
-  const box = $('place-photos');
-  const track = box.querySelector('.pp-track');
-  track.innerHTML = '';
-  photos.forEach((ph, i) => {
-    const img = document.createElement('img');
-    img.alt = '';
-    img.loading = i === 0 ? 'eager' : 'lazy';
-    img.decoding = 'async';
-    img.src = ph.thumb;
-    img.onload = () => img.classList.add('loaded');
-    img.onerror = () => {
-      img.remove();
-      if (!track.children.length) box.hidden = true;
-    };
-    img.onclick = () => openViewer(ph);
-    track.appendChild(img);
-  });
-  const update = () => {
-    const i = Math.min(photos.length - 1, Math.round(track.scrollLeft / Math.max(1, track.clientWidth)));
-    const ph = photos[i];
-    $('pp-count').textContent = `${nearby ? 'Nearby photo' : 'Photo'}${photos.length > 1 ? ` ${i + 1}/${photos.length}` : ''}`;
-    const credit = $('pp-credit');
-    credit.textContent = ph.credit;
-    credit.href = ph.link;
+  // "nearby" photos may show a different building, so they never stand in for the place itself
+  if (mySeq !== seq || !photos.length || nearby) return;
+  const avatar = $('place-avatar-img');
+  const first = photos[0];
+  const probe = new Image();
+  probe.onload = () => {
+    if (mySeq !== seq) return;
+    current.photos = photos;
+    avatar.src = first.thumb;
+    avatar.className = 'is-photo';
+    const count = $('place-photo-count');
+    count.textContent = photos.length > 1 ? `1/${photos.length}` : '';
+    count.hidden = photos.length < 2;
+    const credit = $('place-photo-credit');
+    credit.textContent = `${nearby ? 'Nearby photo' : 'Photo'}: ${first.credit}`;
+    credit.href = first.link;
+    credit.hidden = false;
   };
-  track.onscroll = update;
-  track.scrollLeft = 0;
-  update();
-  box.hidden = false;
-  box.classList.remove('open');
-  requestAnimationFrame(() => box.classList.add('open'));
+  probe.src = first.thumb;
 }
 
-function openViewer(ph) {
+let gallery = { photos: [], i: 0 };
+function openViewer(photos, i = 0) {
+  gallery = { photos, i };
+  showPhoto();
+  $('viewer').hidden = false;
+}
+function showPhoto() {
+  const { photos, i } = gallery;
+  const ph = photos[i];
   const img = $('viewer-img');
   img.onerror = () => {
     img.onerror = null;
@@ -221,21 +207,61 @@ function openViewer(ph) {
   img.src = ph.full;
   $('viewer-credit').textContent = ph.credit;
   $('viewer-credit').href = ph.link;
-  $('viewer').hidden = false;
+  $('viewer-count').textContent = photos.length > 1 ? `${i + 1} / ${photos.length}` : '';
+  $('viewer-prev').hidden = $('viewer-next').hidden = photos.length < 2;
 }
+const step = (n) => {
+  gallery.i = (gallery.i + n + gallery.photos.length) % gallery.photos.length;
+  showPhoto();
+};
 const closeViewer = () => ($('viewer').hidden = true);
 $('viewer-close').onclick = closeViewer;
 $('viewer').onclick = (e) => e.target.id === 'viewer' && closeViewer();
-$('viewer-img').onclick = closeViewer;
+$('viewer-prev').onclick = () => step(-1);
+$('viewer-next').onclick = () => step(1);
+// swipe between photos
+let touchX = null;
+$('viewer').addEventListener('touchstart', (e) => (touchX = e.touches[0].clientX), { passive: true });
+$('viewer').addEventListener('touchend', (e) => {
+  if (touchX == null || gallery.photos.length < 2) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1);
+  touchX = null;
+});
+$('place-avatar').onclick = () => current?.photos.length && openViewer(current.photos, 0);
+
+// ---------------------------------------------------------------- saving
+function refreshSaved() {
+  const kinds = current ? savedKinds(current) : [];
+  $('place-save-btn').classList.toggle('on', kinds.length > 0);
+  document.querySelectorAll('#place-save button').forEach((b) => {
+    b.classList.toggle('on', kinds.includes(b.dataset.kind));
+    if (b.dataset.kind === 'remove') b.hidden = !kinds.length;
+  });
+}
+$('place-save-btn').onclick = () => {
+  $('place-save').hidden = !$('place-save').hidden;
+  refreshSaved();
+};
+$('place-save').onclick = (e) => {
+  const b = e.target.closest('button');
+  if (!b || !current) return;
+  const kind = b.dataset.kind;
+  const place = { name: current.name, coord: current.coord, cls: current.cls };
+  if (kind === 'remove') removePlace(place);
+  else savePlace(kind, place);
+  refreshSaved();
+  current.ctx.onSaved?.(kind === 'remove' ? `Removed ${current.name}` : `Saved ${current.name} as ${kind === 'favorite' ? 'a favorite' : kind[0].toUpperCase() + kind.slice(1)}`);
+};
 
 export function closePlace() {
   seq++;
+  const closing = current;
   current = null;
-  ring?.remove();
-  ring = null;
   const card = $('place');
   card.classList.remove('show');
   setTimeout(() => !current && (card.hidden = true), 220);
+  closing?.ctx.onClose?.();
 }
 
 export const placeOpen = () => !!current;

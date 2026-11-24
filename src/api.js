@@ -296,3 +296,43 @@ export function mergeResults(primary, secondary, near, max = 8) {
   }
   return out;
 }
+
+// ---------------------------------------------------------------- nearby (quick find)
+/** OpenStreetMap places of given tags (e.g. 'amenity:fuel') near a point, via Photon. */
+export async function nearbyPhoton(q, tags, near) {
+  const u = new URL(`${PHOTON}/api/`);
+  u.searchParams.set('q', q);
+  u.searchParams.set('lon', near[0].toFixed(5));
+  u.searchParams.set('lat', near[1].toFixed(5));
+  u.searchParams.set('limit', '15');
+  u.searchParams.set('location_bias_scale', '0.1'); // strongly prefer nearby
+  for (const t of tags) u.searchParams.append('osm_tag', t);
+  const res = await fetch(u);
+  if (!res.ok) throw new Error('nearby search failed');
+  return (await res.json()).features
+    .filter((f) => f.properties.name)
+    .map((f) => {
+      const p = f.properties;
+      return {
+        name: p.name,
+        sub: [[p.housenumber, p.street].filter(Boolean).join(' '), p.city].filter(Boolean).join(', '),
+        coord: f.geometry.coordinates,
+        osmValue: p.osm_value,
+        source: 'osm',
+      };
+    });
+}
+
+/** Foursquare places matching a keyword, nearest first. */
+export async function nearbyFoursquare(query, near) {
+  if (!foursquareEnabled) return [];
+  const j = await fsq('/places/search', {
+    query,
+    ll: `${near[1].toFixed(5)},${near[0].toFixed(5)}`,
+    radius: 8000,
+    sort: 'DISTANCE',
+    limit: 10,
+    fields: FSQ_FIELDS,
+  });
+  return (j.results || []).filter((r) => Number.isFinite(r.latitude)).map(fsqItem);
+}

@@ -96,6 +96,19 @@ After any web code change: `npm run sync` (or the android/ios scripts) to copy i
 - **Start** begins turn-by-turn guidance (auto-reroutes if you go off route).
 - **Demo drive** simulates driving the route, which is handy for testing at a desk.
 
+### Navigation extras
+
+- **Voice guidance**: spoken turn prompts (early warning, closer reminder, "now"), reroute and
+  arrival announcements. Toggle with the speaker button while navigating. Native apps use the
+  system text-to-speech engine; browsers use the Web Speech API.
+- **Speed limit sign**: from OpenStreetMap via the free Valhalla service (FOSSGIS); the speed box
+  turns red when you're over. Hidden on roads without a mapped limit.
+- **Quick find rail** (left edge): nearest gas, food, shops, ATMs, parking, pharmacies and hotels,
+  combining loaded map pins, OpenStreetMap search and Foursquare.
+- **Saved places**: save any place as Home, Work or a favorite from its card (bookmark button).
+  They get their own pins and appear in the empty search box with your recent searches.
+  Stored on the device only.
+
 ### Sensors and background
 
 - **Compass**: when you're stopped or walking, the arrow and map turn with the phone. iOS asks

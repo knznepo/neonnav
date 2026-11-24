@@ -171,6 +171,7 @@ export function buildStyle({ radar = false } = {}) {
       'icon-image': poiIcon,
       'icon-size': radar ? 0.62 : ['interpolate', ['linear'], ['zoom'], 13, 0.55, 17, 0.85],
       'icon-padding': radar ? 10 : 22,
+      'icon-anchor': 'bottom', // pin tail points at the place
       'symbol-sort-key': ['get', 'rank'],
     },
   });

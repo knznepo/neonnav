@@ -5,6 +5,8 @@ PODS:
     - Capacitor
   - CapacitorCommunityKeepAwake (7.1.0):
     - Capacitor
+  - CapacitorCommunityTextToSpeech (6.1.0):
+    - Capacitor
   - CapacitorCordova (7.6.10)
   - CapacitorGeolocation (7.1.8):
     - Capacitor
@@ -15,6 +17,7 @@ DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorCommunityBackgroundGeolocation (from `../../node_modules/@capacitor-community/background-geolocation`)"
   - "CapacitorCommunityKeepAwake (from `../../node_modules/@capacitor-community/keep-awake`)"
+  - "CapacitorCommunityTextToSpeech (from `../../node_modules/@capacitor-community/text-to-speech`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorGeolocation (from `../../node_modules/@capacitor/geolocation`)"
 
@@ -29,6 +32,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor-community/background-geolocation"
   CapacitorCommunityKeepAwake:
     :path: "../../node_modules/@capacitor-community/keep-awake"
+  CapacitorCommunityTextToSpeech:
+    :path: "../../node_modules/@capacitor-community/text-to-speech"
   CapacitorCordova:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorGeolocation:
@@ -38,10 +43,11 @@ SPEC CHECKSUMS:
   Capacitor: f50a57c9ce466bce30d574e1348ab25b1f572536
   CapacitorCommunityBackgroundGeolocation: 412ff6b3439987904b0a25cfb9dcd5ea9a9049c6
   CapacitorCommunityKeepAwake: 05c75aab989f60e621870cf03b24a144a5544c30
+  CapacitorCommunityTextToSpeech: 28e4eaf26995ce7ab710480267841c57ef5eded2
   CapacitorCordova: 33313bf8891d44741970e16534be781ff3caa00a
   CapacitorGeolocation: ab54d708e2fcf99a7bafe0219eaa6f7a932f001a
   IONGeolocationLib: 20f9d0248a0b5264511fb57a37e25dd2badf797a
 
-PODFILE CHECKSUM: 49cd67480e8d074e2ff4bce2408afc706c12322b
+PODFILE CHECKSUM: 7979f7dee37e25bd60a3d5f452ed4f563d5c72ad
 
 COCOAPODS: 1.16.2
