@@ -147,7 +147,7 @@ saved places, RFID balances, settings) to a file; **Import backup** restores it.
 
 ### Analytics
 
-Google Tag Manager container `GTM-55ZWF5SM` loads on the web and in the apps (same code), with an
+Google Tag Manager container `GTM-NWFL2ZLB` loads on the web and in the apps (same code), with an
 `app_platform` value (`web` / `android` / `ios`). Custom events pushed to the dataLayer:
 `navigation_start`, `demo_drive`, `search`, `quick_find` (category), `place_view` (category),
 `toll_deducted` (account, automatic). No locations, place names, search text or balances are sent.
