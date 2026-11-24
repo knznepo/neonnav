@@ -14,7 +14,7 @@ import { initQuickFind, closeQuickFind, quickFindOpen, setQuickFindVisible } fro
 import { getSaved, onSavedChange, getRecents, addRecent } from './saved.js';
 import { speak, stop as stopSpeech, isMuted, setMuted, spokenDistance } from './voice.js';
 import { routeLimits, limitAt, trackLimit } from './speedlimit.js';
-import { fogData, onFogChange, revealAround, revealTown, fogEnabled, setFogEnabled } from './fog.js';
+import { fogData, onFogChange, revealAround, revealTown, revealPath, fogEnabled, setFogEnabled } from './fog.js';
 
 // Native GPS that keeps running with the screen off / app in background (used while navigating).
 const BgGeo = registerPlugin('BackgroundGeolocation');
@@ -202,7 +202,7 @@ async function startLocation() {
 
   // 2) continuous high-accuracy GPS
   if (NATIVE) {
-    startNativeWatch(state.navigating);
+    startNativeWatch();
   } else try {
     if (watchId) await Geolocation.clearWatch({ id: watchId });
     watchId = await Geolocation.watchPosition({ enableHighAccuracy: true, timeout: 30000, maximumAge: 3000 }, (p, err) => {
@@ -221,33 +221,58 @@ async function startLocation() {
 // GPS running when the screen is off or you switch apps.
 let bgWatcherId = null;
 let bgWatcherMode = null;
-async function startNativeWatch(background) {
-  if (bgWatcherId && bgWatcherMode === background) return;
+// 'nav'     navigating: background GPS, every update
+// 'explore' Exploration mode: background GPS without a destination, every ~25 m (saves battery)
+// 'fg'      foreground only
+const EXPLORE_KEY = 'neonnav:explore-bg';
+let exploreBackground = false;
+try {
+  exploreBackground = localStorage.getItem(EXPLORE_KEY) === '1';
+} catch { /* ignore */ }
+const watchMode = () => (state.navigating ? 'nav' : exploreBackground ? 'explore' : 'fg');
+
+async function startNativeWatch() {
+  const mode = watchMode();
+  if (bgWatcherId && bgWatcherMode === mode) return;
   const old = bgWatcherId;
-  bgWatcherMode = background;
+  bgWatcherMode = mode;
+  const notice = {
+    nav: { backgroundTitle: 'NeonNav is navigating', backgroundMessage: 'Tap to return to your route.' },
+    explore: { backgroundTitle: 'NeonNav is exploring', backgroundMessage: 'Uncovering the roads you drive. Turn off in the app\'s map view.' },
+  }[mode];
   try {
     bgWatcherId = await BgGeo.addWatcher(
       {
-        ...(background && {
-          backgroundTitle: 'NeonNav is navigating',
-          backgroundMessage: 'Tap to return to your route.',
-        }),
+        ...notice,
         requestPermissions: true,
         stale: false,
-        distanceFilter: 0,
+        distanceFilter: mode === 'explore' ? 25 : 0,
       },
       (loc, err) => {
         if (err) {
           if (err.code === 'NOT_AUTHORIZED') handleLocationError({ code: 1 });
           return;
         }
-        if (loc) handlePosition({ coords: { longitude: loc.longitude, latitude: loc.latitude, speed: loc.speed, heading: loc.bearing } });
+        if (loc) {
+          handlePosition({
+            timestamp: loc.time,
+            coords: { longitude: loc.longitude, latitude: loc.latitude, speed: loc.speed, heading: loc.bearing, accuracy: loc.accuracy },
+          });
+        }
       },
     );
   } catch (e) {
     handleLocationError(e);
   }
   if (old) BgGeo.removeWatcher({ id: old }).catch(() => {});
+}
+
+function setExploreBackground(on) {
+  exploreBackground = on;
+  try {
+    localStorage.setItem(EXPLORE_KEY, on ? '1' : '0');
+  } catch { /* ignore */ }
+  startNativeWatch();
 }
 
 function handlePosition(p) {
@@ -277,6 +302,7 @@ function handlePosition(p) {
   }
   state.lastRealFix = { coord: c, heading: h, time };
   trackSpeedLimit(c);
+  if (prev && !state.fallback) fillGap(prev, c, time, p.coords.accuracy);
   exploreAt(c);
   saveLastPos(c);
   if (state.fallback) {
@@ -286,6 +312,16 @@ function handlePosition(p) {
     toast('Location found', 1500);
   }
   if (!state.sim) onFix(c, h, spd);
+}
+
+// After a gap in tracking (app hidden, screen locked, no signal), reveal the likely road between
+// the last fix and this one. It's an estimate of the route taken, so only for gaps under 30 km.
+function fillGap(prev, c, time, accuracy) {
+  const d = dist(prev.coord, c);
+  if (d < 400 || d > 30000 || time - prev.time < 15000 || (accuracy ?? 0) > 100) return;
+  getRoute(prev.coord, c)
+    .then((r) => revealPath(r.coords))
+    .catch(() => d < 2000 && revealPath([prev.coord, c]));
 }
 
 // Exploration fog: reveal your town once per session, then a corridor wherever you go.
@@ -901,7 +937,7 @@ function startNav() {
   state.navigating = true;
   setNavLayout(true);
   closePlace();
-  if (NATIVE) startNativeWatch(true);
+  if (NATIVE) startNativeWatch();
   updateAwake();
   $('search').hidden = true;
   results.hidden = true;
@@ -928,7 +964,7 @@ function clearRoute() {
   state.dest = null;
   state.navigating = false;
   setNavLayout(false);
-  if (NATIVE) startNativeWatch(false);
+  if (NATIVE) startNativeWatch();
   updateAwake();
   state.nextStepAlong = Infinity;
   state.currentRoad = '';
@@ -982,6 +1018,22 @@ $('btn-minimap').onclick = () => {
   toast(showMinimap ? 'Minimap on' : 'Minimap off', 1200);
 };
 applyMinimap();
+
+if (NATIVE) {
+  const label = () => ($('btn-explore').textContent = `Background: ${exploreBackground ? 'On' : 'Off'}`);
+  $('btn-explore').hidden = false;
+  label();
+  $('btn-explore').onclick = () => {
+    setExploreBackground(!exploreBackground);
+    label();
+    toast(
+      exploreBackground
+        ? 'Exploration mode on: the map keeps uncovering roads in the background. Uses more battery.'
+        : 'Exploration mode off: tracking only while the app is open or navigating.',
+      4000,
+    );
+  };
+}
 
 $('btn-fog').textContent = `Fog: ${fogEnabled() ? 'On' : 'Off'}`;
 $('btn-fog').onclick = () => {

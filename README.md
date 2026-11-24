@@ -115,6 +115,12 @@ After any web code change: `npm run sync` (or the android/ios scripts) to copy i
   current town or city (its OpenStreetMap boundary, via Nominatim) is revealed when the app
   starts, plus a ~450 m corridor around everywhere you actually go (real GPS only). Progress is
   saved on the device. Turn it on or off with the **Fog** button in map view.
+- **Gap filling**: if tracking pauses (browser hidden, screen locked, no signal) and you reappear
+  somewhere else, the likely road between the two points is revealed (gaps under 30 km).
+- **Background exploration (native apps only)**: the **Background** button in map view keeps GPS
+  running without a destination (Android shows a notification; iOS shows the location
+  indicator). Uses more battery. Browsers can't track location in the background at all, so
+  on the web keep the app open on screen while driving.
 - **Minimap toggle**: the minimap button (drive view) shows or hides the minimap; remembered.
 
 ### Sensors and background

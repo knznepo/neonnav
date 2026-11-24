@@ -722,7 +722,9 @@ body.nav #rail { display: none; }
 /* legend header with the exploration fog switch */
 .legend-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .legend-head .legend-title { margin-bottom: 0; }
-#btn-fog { height: 28px; padding: 0 10px; font-size: 11px; border-radius: 4px; flex: none; }
+.legend-btns { display: flex; gap: 6px; flex: none; }
+#btn-fog, #btn-explore { height: 28px; padding: 0 10px; font-size: 11px; border-radius: 4px; flex: none; }
+.legend-head { flex-wrap: wrap; }
 
 /* minimap toggle */
 body.mode-map #btn-minimap { display: none; }

@@ -111,6 +111,25 @@ export async function revealTown(pos) {
   return null;
 }
 
+/** Reveal a corridor along a path (e.g. the likely road between two GPS fixes after a gap). */
+export function revealPath(coords) {
+  if (!coords || coords.length < 2) return;
+  const pts = [coords[0]];
+  for (const c of coords) if (dist(pts[pts.length - 1], c) >= 150) pts.push(c);
+  pts.push(coords[coords.length - 1]);
+  const circles = pts.map((pt) => circle(pt, REVEAL_KM, { steps: 16, units: 'kilometers' }));
+  try {
+    // one union of everything at once is far faster than adding circles one by one
+    const merged = union(featureCollection(explored ? [explored, ...circles] : circles));
+    explored = merged;
+    write(KEY, explored);
+    lastReveal = coords[coords.length - 1];
+    changed();
+  } catch {
+    /* geometry error: skip */
+  }
+}
+
 export function resetExploration() {
   explored = null;
   lastReveal = null;
