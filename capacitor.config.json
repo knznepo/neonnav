@@ -1,0 +1,8 @@
+{
+  "appId": "com.neonnav.app",
+  "appName": "NeonNav",
+  "webDir": "dist",
+  "backgroundColor": "#0b0d10",
+  "ios": { "contentInset": "never", "backgroundColor": "#0b0d10" },
+  "android": { "backgroundColor": "#0b0d10", "useLegacyBridge": true }
+}

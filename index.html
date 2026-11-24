@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0d10" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="NeonNav" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <title>NeonNav</title>
+  </head>
+  <body class="mode-drive">
+    <div id="map"></div>
+    <div class="vignette"></div>
+
+    <header id="top">
+      <div id="search" class="panel">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <input id="q" type="search" placeholder="Where to?" autocomplete="off" enterkeyhint="search" />
+        <button id="q-clear" class="icon-btn" aria-label="Clear" hidden>✕</button>
+      </div>
+      <ul id="results" class="panel" hidden></ul>
+
+      <div id="turn" class="panel" hidden>
+        <div id="turn-arrow">
+          <svg viewBox="0 0 24 24" width="34" height="34"><path d="M12 3 5 11h4.5v10h5V11H19z" fill="#fff"/></svg>
+        </div>
+        <div class="turn-body">
+          <div id="turn-dist">—</div>
+          <div id="turn-text"></div>
+        </div>
+      </div>
+    </header>
+
+    <footer id="bottom">
+      <section id="sheet" class="panel" hidden>
+        <div id="dest-name"></div>
+        <div id="dest-meta"></div>
+        <div class="sheet-actions">
+          <button id="btn-go" class="primary">Start</button>
+          <button id="btn-demo">Demo drive</button>
+          <button id="btn-cancel" class="icon-btn" aria-label="Cancel route">✕</button>
+        </div>
+      </section>
+
+      <div id="hud-row">
+        <div id="radar-block">
+          <div id="radar-wrap">
+            <div id="radar"></div>
+            <div id="radar-ring">
+              <span id="radar-n">N</span>
+              <span id="radar-edge" hidden></span>
+            </div>
+          </div>
+          <div id="radar-info">
+            <div id="street" class="panel">Locating…</div>
+            <div id="speed" class="panel"><b id="speed-val">0</b><span id="speed-unit">km/h</span></div>
+          </div>
+        </div>
+
+        <div id="legend" class="panel">
+          <div class="legend-title">Tap the map to set a waypoint</div>
+          <ul id="legend-list"></ul>
+        </div>
+
+        <div id="fabs">
+          <button id="btn-compass" class="fab" aria-label="Enable compass" hidden>
+            <svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4.5 14.6 12h-5.2z" fill="#ff4f5e"/><path d="M12 19.5 9.4 12h5.2z" fill="currentColor"/></svg>
+          </button>
+          <button id="btn-center" class="fab" aria-label="Recenter" hidden>
+            <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2 20 21 12 16.5 4 21z" fill="currentColor"/></svg>
+          </button>
+          <button id="btn-mode" class="fab" aria-label="Toggle map">
+            <svg class="ico-map" viewBox="0 0 24 24" width="22" height="22"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 2.2 6 2v11.6l-6-2V6.2z" fill="currentColor"/></svg>
+            <svg class="ico-drive" viewBox="0 0 24 24" width="22" height="22"><path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11v7h-2v-2H7v2H5zm2.2-1h9.6l-1-3H8.2zM7.5 14a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zm9 0a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </div>
+    </footer>
+
+    <section id="place" hidden>
+      <div id="place-photos" hidden>
+        <div class="pp-track"></div>
+        <div class="pp-meta">
+          <span id="pp-count"></span>
+          <a id="pp-credit" target="_blank" rel="noopener"></a>
+        </div>
+      </div>
+      <div class="place-hero">
+        <div class="place-icon-wrap"><img id="place-icon" alt="" /></div>
+        <div class="place-titles">
+          <div class="place-cat-row"><span id="place-cat"></span><span id="place-badge" hidden></span></div>
+          <h2 id="place-name"></h2>
+        </div>
+        <button id="place-close" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="place-stats">
+        <div><span>Distance</span><b id="place-dist">—</b></div>
+        <div><span>Direction</span><b id="place-dir">—</b></div>
+        <div><span>Est. drive</span><b id="place-time">—</b></div>
+      </div>
+      <div id="place-chips" hidden></div>
+      <ul id="place-info"></ul>
+      <div class="place-actions">
+        <button id="place-waypoint">Set waypoint</button>
+        <button id="place-go" class="primary">Go now</button>
+        <a id="place-call" class="btn-icon" aria-label="Call" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg></a>
+        <a id="place-web" class="btn-icon" aria-label="Website" target="_blank" rel="noopener" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></a>
+      </div>
+    </section>
+
+    <div id="viewer" hidden>
+      <img id="viewer-img" alt="" />
+      <a id="viewer-credit" target="_blank" rel="noopener"></a>
+      <button id="viewer-close" class="icon-btn" aria-label="Close photo">✕</button>
+    </div>
+
+    <div id="toast" class="panel" hidden></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
