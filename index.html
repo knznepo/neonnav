@@ -28,15 +28,6 @@
       </div>
       <ul id="results" class="panel" hidden></ul>
 
-      <div id="turn" class="panel" hidden>
-        <div id="turn-arrow">
-          <svg viewBox="0 0 24 24" width="34" height="34"><path d="M12 3 5 11h4.5v10h5V11H19z" fill="#fff"/></svg>
-        </div>
-        <div class="turn-body">
-          <div id="turn-dist">—</div>
-          <div id="turn-text"></div>
-        </div>
-      </div>
     </header>
 
     <footer id="bottom">
@@ -52,8 +43,19 @@
 
       <div id="hud-row">
         <div id="radar-block">
+          <!-- next turn, attached to the top of the minimap while navigating -->
+          <div id="turn" hidden>
+            <div class="turn-body">
+              <div id="turn-title">—</div>
+              <div id="turn-dist"></div>
+            </div>
+            <div id="turn-arrow">
+              <svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 3 5 11h4.5v10h5V11H19z" fill="#fff"/></svg>
+            </div>
+          </div>
           <div id="radar-wrap">
             <div id="radar"></div>
+            <span id="radar-remaining" hidden></span>
             <div id="radar-ring">
               <span id="radar-n">N</span>
               <span id="radar-edge" hidden></span>

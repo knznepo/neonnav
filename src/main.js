@@ -120,7 +120,8 @@ function lineData(coords) {
 }
 
 // ---------------------------------------------------------------- markers
-const PLAYER_SVG = '<div class="beam"></div><svg viewBox="0 0 64 64"><path d="M32 5 55 57 32 45 9 57z" fill="#fff" stroke="#0b0d10" stroke-width="5" stroke-linejoin="round"/></svg>';
+// White arrow inside a dark circle; the circle stays round and upright on screen.
+const PLAYER_SVG = '<div class="beam"></div><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#121318"/><path d="M32 13 45 47 32 40 19 47z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>';
 const DEST_SVG = '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#ff5fb4" stroke="#0b0d10" stroke-width="3.5"/></svg>';
 
 function el(cls, html) {
@@ -131,8 +132,8 @@ function el(cls, html) {
 }
 
 const playerMarkers = [
-  new maplibregl.Marker({ element: el('player', PLAYER_SVG), rotationAlignment: 'map', pitchAlignment: 'map' }),
-  new maplibregl.Marker({ element: el('player small', PLAYER_SVG), rotationAlignment: 'map', pitchAlignment: 'map' }),
+  new maplibregl.Marker({ element: el('player', PLAYER_SVG), rotationAlignment: 'map', pitchAlignment: 'viewport' }),
+  new maplibregl.Marker({ element: el('player small', PLAYER_SVG), rotationAlignment: 'map', pitchAlignment: 'viewport' }),
 ];
 const destMarkers = [
   new maplibregl.Marker({ element: el('dest', DEST_SVG), anchor: 'center' }),
@@ -413,20 +414,27 @@ function trackSpeedLimit(coord) {
 }
 
 function updateRadarOverlay() {
-  const size = $('radar-wrap').clientWidth;
-  const r = size / 2;
-  const n = -state.camBearing;
-  $('radar-n').style.transform = `rotate(${n}deg) translateY(${-(r - 13)}px) rotate(${-n}deg)`;
+  const w = $('radar').clientWidth;
+  const h = $('radar').clientHeight;
+  // where a direction (degrees clockwise from screen-up) meets the minimap's edge, inset a little
+  const edgePoint = (deg, inset) => {
+    const a = (deg * Math.PI) / 180;
+    const dx = Math.sin(a);
+    const dy = -Math.cos(a);
+    const t = Math.min((w / 2 - inset) / Math.abs(dx || 1e-9), (h / 2 - inset) / Math.abs(dy || 1e-9));
+    return [w / 2 + dx * t, h / 2 + dy * t];
+  };
+  const place = (elem, [x, y], size) => (elem.style.transform = `translate(${x - size / 2}px, ${y - size / 2}px)`);
+
+  place($('radar-n'), edgePoint(-state.camBearing, 13), 20);
 
   const edge = $('radar-edge');
   if (!state.dest) return (edge.hidden = true);
   const p = radar.project(state.dest.coord);
-  const dx = p.x - r;
-  const dy = p.y - r;
-  if (Math.hypot(dx, dy) < r - 12) return (edge.hidden = true);
-  const a = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  const inside = p.x > 10 && p.x < w - 10 && p.y > 10 && p.y < h - 10;
+  if (inside) return (edge.hidden = true);
   edge.hidden = false;
-  edge.style.transform = `rotate(${a}deg) translateY(${-(r - 10)}px) rotate(${-a}deg)`;
+  place(edge, edgePoint((Math.atan2(p.x - w / 2, -(p.y - h / 2)) * 180) / Math.PI, 11), 14);
 }
 
 // ---------------------------------------------------------------- modes
@@ -796,8 +804,9 @@ function updateNav(force = false) {
   if (state.navigating) {
     announce(next, next.along - s.along);
     if (state.currentRoad) $('street-text').textContent = state.currentRoad;
-    $('turn-dist').textContent = fmtDist(Math.max(0, next.along - s.along));
-    $('turn-text').textContent = next.text;
+    $('turn-title').textContent = shortTitle(next);
+    $('turn-dist').textContent = [fmtDist(Math.max(0, next.along - s.along)), next.type !== 'arrive' && next.name].filter(Boolean).join(' · ');
+    $('radar-remaining').textContent = fmtDist(remaining);
     const arrow = $('turn-arrow').firstElementChild;
     arrow.style.transform = next.type === 'arrive' ? 'rotate(0deg) scale(0.8)' : `rotate(${turnAngle(next)}deg)`;
     if (now - state.lastTrim > 300) {
@@ -805,6 +814,30 @@ function updateNav(force = false) {
       r.remaining = [s.point, ...r.coords.slice(s.index + 1)];
       setRouteLine(r.remaining);
     }
+  }
+}
+
+// Short maneuver title for the turn panel, e.g. "Keep left", "Take exit", "Roundabout, exit 2".
+function shortTitle(step) {
+  const mod = step.modifier || '';
+  const side = mod.replace('slight ', '').replace('sharp ', '');
+  switch (step.type) {
+    case 'arrive': return 'Arrive';
+    case 'depart': return 'Head out';
+    case 'roundabout':
+    case 'rotary': return step.exit ? `Roundabout, exit ${step.exit}` : 'Roundabout';
+    case 'merge': return 'Merge';
+    case 'on ramp': return 'Take ramp';
+    case 'off ramp': return 'Take exit';
+    case 'fork': return `Keep ${side}`;
+    case 'continue':
+    case 'new name': return 'Continue';
+    default:
+      if (mod === 'straight') return 'Continue straight';
+      if (mod === 'uturn') return 'Make a U-turn';
+      if (mod.startsWith('slight')) return `Bear ${side}`;
+      if (mod.startsWith('sharp')) return `Sharp ${side}`;
+      return `Turn ${mod}`;
   }
 }
 
@@ -850,6 +883,7 @@ function startNav() {
   $('turn').hidden = false;
   $('btn-go').hidden = true;
   $('btn-voice').hidden = false;
+  $('radar-remaining').hidden = false;
   state.voice = null;
   const r = state.route;
   speak(`Starting route to ${state.dest?.name || 'your destination'}. About ${fmtDuration(r.duration)}.`);
@@ -875,6 +909,7 @@ function clearRoute() {
   state.currentRoad = '';
   state.voice = null;
   $('btn-voice').hidden = true;
+  $('radar-remaining').hidden = true;
   destMarkers.forEach((mk) => mk.remove());
   setRouteLine(null);
   $('sheet').hidden = true;
