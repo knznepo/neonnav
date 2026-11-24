@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0d10" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="NeonNav" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=Passion+One&display=swap" rel="stylesheet" />
+    <title>NeonNav</title>
+    <!-- Google Tag Manager (GTM-NWFL2ZLB). Skipped if the user turned off usage stats in Settings. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { dataLayer.push(arguments); }
+      (function () {
+        var off = false;
+        try { off = localStorage.getItem('neonnav:analytics') === '0'; } catch (e) {}
+        if (off) return;
+        var cap = window.Capacitor;
+        dataLayer.push({ app_platform: (cap && cap.getPlatform && cap.getPlatform()) || 'web' });
+        dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtm.js?id=GTM-NWFL2ZLB';
+        document.head.appendChild(s);
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-eSGGz9Sj.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-D9Bk5Bv_.css">
+  </head>
+  <body class="mode-drive">
+    <div id="map"></div>
+    <div class="vignette"></div>
+
+    <header id="top">
+      <div id="search" class="panel">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <input id="q" type="search" placeholder="Where to?" autocomplete="off" enterkeyhint="search" />
+        <button id="q-clear" class="icon-btn" aria-label="Clear" hidden>✕</button>
+      </div>
+      <ul id="results" class="panel" hidden></ul>
+
+    </header>
+
+    <footer id="bottom">
+      <section id="sheet" class="panel" hidden>
+        <div id="dest-name"></div>
+        <div id="dest-meta"></div>
+        <div id="dest-tolls" hidden></div>
+        <div class="sheet-actions">
+          <button id="btn-go" class="primary">Start</button>
+          <button id="btn-demo">Demo drive</button>
+          <button id="btn-cancel" class="icon-btn" aria-label="Cancel route">✕</button>
+        </div>
+      </section>
+
+      <div id="hud-row">
+        <div id="radar-block">
+          <!-- next turn, attached to the top of the minimap while navigating -->
+          <div id="turn" hidden>
+            <div class="turn-body">
+              <div id="turn-title">—</div>
+              <div id="turn-dist"></div>
+            </div>
+            <div id="turn-arrow">
+              <svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 3 5 11h4.5v10h5V11H19z" fill="#fff"/></svg>
+            </div>
+          </div>
+          <div id="radar-wrap">
+            <div id="radar"></div>
+            <span id="radar-remaining" hidden></span>
+            <div id="radar-ring">
+              <span id="radar-n">N</span>
+              <span id="radar-edge" hidden></span>
+            </div>
+          </div>
+          <div id="radar-info">
+            <div id="street" class="panel"><span id="street-text">Locating…</span></div>
+            <div id="limit" hidden><b id="limit-val"></b></div>
+            <div id="speed" class="panel"><b id="speed-val">0</b><span id="speed-unit">km/h</span></div>
+          </div>
+        </div>
+
+        <div id="legend" class="panel">
+          <div class="legend-head">
+            <div class="legend-title">Tap the map to set a waypoint</div>
+            <div class="legend-btns">
+              <button id="btn-explore" aria-label="Keep exploring in the background" hidden>Background: Off</button>
+              <button id="btn-settings" aria-label="Settings" title="Settings">⚙</button>
+            </div>
+          </div>
+          <ul id="legend-list"></ul>
+        </div>
+
+        <div id="fabs">
+          <button id="btn-compass" class="fab" aria-label="Enable compass" hidden>
+            <svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4.5 14.6 12h-5.2z" fill="#ff4f5e"/><path d="M12 19.5 9.4 12h5.2z" fill="currentColor"/></svg>
+          </button>
+          <button id="btn-voice" class="fab" aria-label="Voice guidance" hidden>
+            <svg class="ico-on" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M3 9h4l5-4v14l-5-4H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+            <svg class="ico-off" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M3 9h4l5-4v14l-5-4H3zm13.6 3 2.7-2.7 1.4 1.4-2.7 2.7 2.7 2.7-1.4 1.4-2.7-2.7-2.7 2.7-1.4-1.4 2.7-2.7-2.7-2.7 1.4-1.4z"/></svg>
+          </button>
+          <button id="btn-center" class="fab" aria-label="Recenter" hidden>
+            <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2 20 21 12 16.5 4 21z" fill="currentColor"/></svg>
+          </button>
+          <button id="btn-minimap" class="fab" aria-label="Show or hide minimap" title="Minimap">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="3"/><rect class="mm-inner" x="6" y="11" width="8" height="5" rx="1.2" fill="currentColor" stroke="none"/></svg>
+          </button>
+          <button id="btn-mode" class="fab" aria-label="Toggle map">
+            <svg class="ico-map" viewBox="0 0 24 24" width="22" height="22"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zm0 2.2 6 2v11.6l-6-2V6.2z" fill="currentColor"/></svg>
+            <svg class="ico-drive" viewBox="0 0 24 24" width="22" height="22"><path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11v7h-2v-2H7v2H5zm2.2-1h9.6l-1-3H8.2zM7.5 14a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zm9 0a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </div>
+    </footer>
+
+    <section id="place" hidden>
+      <div class="pc-head">
+        <button id="place-avatar" class="pc-avatar" aria-label="Photos">
+          <img id="place-avatar-img" alt="" />
+          <span id="place-photo-count" hidden></span>
+        </button>
+        <div class="pc-titles">
+          <h2 id="place-name"></h2>
+          <div class="pc-sub"><span id="place-cat"></span><span id="place-badge" hidden></span></div>
+        </div>
+        <button id="place-close" class="pc-close" aria-label="Close">✕</button>
+      </div>
+      <p id="place-desc"></p>
+      <div id="place-chips" hidden></div>
+      <ul id="place-info"></ul>
+      <a id="place-photo-credit" target="_blank" rel="noopener" hidden></a>
+      <div id="place-save" hidden>
+        <button data-kind="home">Home</button>
+        <button data-kind="work">Work</button>
+        <button data-kind="favorite">Favorite</button>
+        <button data-kind="remove">Remove</button>
+      </div>
+      <div class="place-actions">
+        <button id="place-go" class="primary">Go now</button>
+        <button id="place-waypoint">Waypoint</button>
+        <button id="place-save-btn" class="btn-icon" aria-label="Save place"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4.5L5 21V4a1 1 0 0 1 1-1zm1 2v12.3l5-3.2 5 3.2V5z"/></svg></button>
+        <a id="place-call" class="btn-icon" aria-label="Call" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg></a>
+        <a id="place-web" class="btn-icon" aria-label="Website" target="_blank" rel="noopener" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></a>
+      </div>
+    </section>
+
+    <nav id="rail" aria-label="Quick find"></nav>
+    <section id="qf-panel" hidden>
+      <div class="pc-head">
+        <div class="pc-avatar qf-avatar"><img id="qf-icon" alt="" /></div>
+        <div class="pc-titles">
+          <h2 id="qf-title"></h2>
+          <div class="pc-sub"><span id="qf-sub"></span></div>
+        </div>
+        <button id="qf-close" class="pc-close" aria-label="Close">✕</button>
+      </div>
+      <ul id="qf-list"></ul>
+    </section>
+
+    <div id="viewer" hidden>
+      <img id="viewer-img" alt="" />
+      <button id="viewer-prev" class="viewer-nav" aria-label="Previous photo" hidden>‹</button>
+      <button id="viewer-next" class="viewer-nav" aria-label="Next photo" hidden>›</button>
+      <span id="viewer-count"></span>
+      <a id="viewer-credit" target="_blank" rel="noopener"></a>
+      <button id="viewer-close" class="icon-btn" aria-label="Close photo">✕</button>
+    </div>
+
+    <!-- RFID balances, top-right -->
+    <div id="wallet"></div>
+
+    <section id="wallet-panel" hidden>
+      <div class="pc-head">
+        <div class="pc-titles">
+          <h2>RFID balances</h2>
+          <div class="pc-sub"><span>Tolls are deducted automatically when you leave a toll road</span></div>
+        </div>
+        <button id="wallet-close" class="pc-close" aria-label="Close">✕</button>
+      </div>
+      <div id="wallet-accounts"></div>
+      <div class="wp-section">Saved toll trips</div>
+      <ul id="wallet-tolls" class="wp-list"></ul>
+      <div class="wp-section">Recent</div>
+      <ul id="wallet-history" class="wp-list"></ul>
+    </section>
+
+    <section id="toll-panel" hidden>
+      <div class="pc-head">
+        <div class="pc-avatar toll-avatar">₱</div>
+        <div class="pc-titles">
+          <h2>Toll trip</h2>
+          <div class="pc-sub"><span id="toll-route"></span></div>
+        </div>
+        <button id="toll-close" class="pc-close" aria-label="Close">✕</button>
+      </div>
+      <p class="toll-q">How much was the toll? It'll be remembered and deducted automatically next time.</p>
+      <div class="toll-form">
+        <input id="toll-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Amount (₱)" />
+        <div class="seg" id="toll-acc">
+          <button data-acc="easytrip">Easytrip</button>
+          <button data-acc="autosweep">Autosweep</button>
+        </div>
+      </div>
+      <div class="place-actions">
+        <button id="toll-save" class="primary">Deduct &amp; remember</button>
+        <button id="toll-skip">Skip</button>
+      </div>
+    </section>
+
+    <section id="settings-panel" hidden>
+      <div class="pc-head">
+        <div class="pc-titles">
+          <h2>Settings</h2>
+          <div class="pc-sub"><span>Everything is stored on this device</span></div>
+        </div>
+        <button id="settings-close" class="pc-close" aria-label="Close">✕</button>
+      </div>
+      <div class="set-group">
+        <div class="set-label">Backup</div>
+        <p class="set-help">Save your explored map, saved places, RFID balances and settings to a file, or restore them on this or another phone.</p>
+        <div class="set-btns">
+          <button id="btn-export">Export backup</button>
+          <button id="btn-import">Import backup</button>
+          <input id="import-file" type="file" accept="application/json,.json" hidden />
+        </div>
+      </div>
+      <div class="set-group">
+        <div class="set-label">Privacy</div>
+        <p class="set-help">Anonymous usage stats (which features are used) help improve the app. Your location, searches and saved places are never sent.</p>
+        <div class="set-btns"><button id="btn-analytics">Usage stats: On</button></div>
+      </div>
+      <div class="set-group">
+        <div class="set-label">RFID</div>
+        <div class="set-btns"><button id="btn-open-wallet">Manage balances</button></div>
+      </div>
+      <div class="set-group">
+        <div class="set-label">Exploration</div>
+        <div class="set-btns">
+          <button id="btn-fog" aria-label="Toggle exploration fog">Fog: On</button>
+          <button id="btn-reset-explore" class="danger">Reset explored map</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="toast" class="panel" hidden></div>
+  </body>
+</html>
