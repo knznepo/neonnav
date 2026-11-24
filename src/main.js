@@ -1299,7 +1299,7 @@ function renderRouteTolls() {
     const neg = after != null && after < 0;
     let text;
     if (bal == null) text = `Use ${a.label} · balance not set`;
-    else if (!g.total) text = `Use ${a.label} · ${fmtPeso(bal)}`;
+    else if (!g.total) text = `Use ${a.label}`;
     else text = `${a.label} ${fmtPeso(bal)} → <b>${neg ? '−' + fmtPeso(-after) : fmtPeso(after)}</b>${neg ? ' · reload needed' : ''}`;
     lines.push(`<div class="dt-row${neg ? ' neg' : ''}">${badgeHtml(acc)}<span>${text}</span></div>`);
   }
