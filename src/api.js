@@ -94,6 +94,8 @@ export async function getRoute(from, to) {
       modifier: s.maneuver.modifier || 'straight',
       exit: s.maneuver.exit,
       name: s.name || s.ref || '',
+      fullName: s.name || '',
+      ref: s.ref || '',
       text: instruction(s),
     })),
   };

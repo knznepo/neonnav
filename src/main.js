@@ -1270,42 +1270,113 @@ function renderRouteTolls() {
   box.hidden = false;
   if (r.tollsChecked === false) return (box.innerHTML = '<span class="dt-dim">Checking tolls…</span>');
   if (r.tollsChecked === 'failed') return (box.innerHTML = '<span class="dt-dim">Toll info unavailable right now</span>');
-  const segs = routeTollSegments(r.limits);
+  const segs = routeTollSegments(r.limits).map((seg) => describeTollSegment(r, seg));
   if (!segs.length) return (box.innerHTML = '<span class="dt-dim">No tolls on this route</span>');
 
   const w = getWallet();
-  const perAcc = {}; // account -> total known amount
-  const unknown = []; // account guesses for stretches without a learned amount
-  for (const seg of segs) {
-    const known = findToll(seg.entry, seg.exit, dist, 3000);
-    if (known) perAcc[known.account] = (perAcc[known.account] || 0) + known.amount;
-    else unknown.push(roadAccount(seg.names) || guessAccount(seg.names));
-  }
-  const lines = [];
+  const perAcc = {};
+  for (const sg of segs) if (sg.amount != null && sg.account) perAcc[sg.account] = (perAcc[sg.account] || 0) + sg.amount;
   const total = Object.values(perAcc).reduce((a, b) => a + b, 0);
-  lines.push(
-    `<div class="dt-head">Tolls: <b>${total ? fmtPeso(total) : '—'}</b>` +
-      `${unknown.length ? ` <span class="dt-dim">+ ${unknown.length} not yet known</span>` : ''}</div>`,
-  );
+  const missing = segs.filter((sg) => sg.amount == null).length;
+
+  box.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'dt-head';
+  head.innerHTML = `Tolls: <b>${total ? fmtPeso(total) : '—'}</b>${missing ? ` <span class="dt-dim">· ${missing} amount${missing > 1 ? 's' : ''} needed</span>` : ''}`;
+  box.appendChild(head);
+
+  // one row per toll road: name, which RFID to use, and the amount (or a box to enter it)
+  segs.forEach((sg) => {
+    const row = document.createElement('div');
+    row.className = 'dt-seg';
+    const accLabel = sg.account ? ACCOUNTS[sg.account].label : 'Easytrip or Autosweep?';
+    row.innerHTML = `${sg.account ? badgeHtml(sg.account) : '<span class="wal-badge dt-q">?</span>'}
+      <div class="dt-seg-main"><div class="dt-seg-name"></div><div class="dt-seg-acc">Use ${accLabel}</div></div>
+      <div class="dt-seg-amt"></div>`;
+    row.querySelector('.dt-seg-name').textContent = sg.label;
+    const amt = row.querySelector('.dt-seg-amt');
+    if (sg.amount != null) {
+      amt.innerHTML = `<b>${fmtPeso(sg.amount)}</b><button class="dt-edit" aria-label="Change amount">✎</button>`;
+      amt.querySelector('.dt-edit').onclick = () => editSegment(row, sg);
+    } else {
+      editSegment(row, sg);
+    }
+    box.appendChild(row);
+  });
+
+  // balances after the trip
   for (const [acc, amt] of Object.entries(perAcc)) {
     const a = ACCOUNTS[acc];
     const bal = w.balances[acc];
+    const line = document.createElement('div');
     if (bal == null) {
-      lines.push(`<div class="dt-row">${badgeHtml(acc)}<span>${a.label}: ${fmtPeso(amt)} · balance not set</span></div>`);
-      continue;
+      line.className = 'dt-row';
+      line.innerHTML = `${badgeHtml(acc)}<span>${a.label}: balance not set</span>`;
+    } else {
+      const after = Math.round((bal - amt) * 100) / 100;
+      const neg = after < 0;
+      line.className = `dt-row${neg ? ' neg' : ''}`;
+      line.innerHTML = `${badgeHtml(acc)}<span>${a.label} ${fmtPeso(bal)} → <b>${neg ? '−' + fmtPeso(-after) : fmtPeso(after)}</b>${neg ? ' · reload needed' : ''}</span>`;
     }
-    const after = Math.round((bal - amt) * 100) / 100;
-    const neg = after < 0;
-    lines.push(
-      `<div class="dt-row${neg ? ' neg' : ''}">${badgeHtml(acc)}<span>${a.label} ${fmtPeso(bal)} → <b>${neg ? '−' + fmtPeso(-after) : fmtPeso(after)}</b>` +
-        `${neg ? ' · reload needed' : ''}</span></div>`,
-    );
+    box.appendChild(line);
   }
-  if (unknown.length) {
-    const names = [...new Set(unknown.map((acc) => ACCOUNTS[acc]?.label || 'RFID'))].join(' / ');
-    lines.push(`<div class="dt-dim dt-note">${names} toll amount not learned yet. You'll be asked once after passing it.</div>`);
+}
+
+/** Name, account and known amount for one toll stretch of the planned route. */
+function describeTollSegment(r, seg) {
+  const names = [...tollNamesOnRoute(r, seg.entry, seg.exit), ...seg.names];
+  const nice = names.find((n) => /expressway|skyway|tollway|link|connector|toll/i.test(n)) || names.find((n) => !/^[ENR]\d+$/i.test(n)) || names[0] || 'Toll road';
+  const known = findToll(seg.entry, seg.exit, dist, 3000);
+  return {
+    ...seg,
+    names,
+    label: nice,
+    key: known?.key || tripKey(seg.entry, seg.exit),
+    amount: known ? known.amount : null,
+    account: known?.account || roadAccount(names) || guessAccount(names),
+  };
+}
+
+/** Full road names (e.g. "North Luzon Expressway") from the route's steps between two points. */
+function tollNamesOnRoute(r, entry, exit) {
+  if (!r?.steps?.length) return [];
+  const a = snap(r.coords, r.cum, entry).along - 300;
+  const b = snap(r.coords, r.cum, exit).along + 300;
+  const out = [];
+  r.steps.forEach((st, i) => {
+    const end = r.steps[i + 1]?.along ?? Infinity;
+    if (st.along <= b && end >= a) for (const n of [st.fullName, st.ref]) if (n && !out.includes(n)) out.push(n);
+  });
+  return out;
+}
+
+/** Inline editor: amount + account for a toll stretch; saving teaches the app this trip. */
+function editSegment(row, sg) {
+  const amt = row.querySelector('.dt-seg-amt');
+  amt.innerHTML = `<input type="number" inputmode="decimal" min="0" step="0.01" placeholder="₱" value="${sg.amount ?? ''}"><button class="dt-save">Save</button>`;
+  let account = sg.account;
+  if (!account) {
+    // let the user pick the RFID when the road name doesn't tell us
+    const pick = document.createElement('div');
+    pick.className = 'seg dt-pick';
+    pick.innerHTML = Object.entries(ACCOUNTS).map(([k, a]) => `<button data-acc="${k}">${a.label}</button>`).join('');
+    pick.onclick = (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      account = b.dataset.acc;
+      pick.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    };
+    row.querySelector('.dt-seg-main').appendChild(pick);
   }
-  box.innerHTML = lines.join('');
+  amt.querySelector('.dt-save').onclick = () => {
+    const v = Number(amt.querySelector('input').value);
+    if (!(v > 0)) return toast('Enter the toll amount', 1500);
+    if (!account) return toast('Choose Easytrip or Autosweep', 1500);
+    learnToll(sg.key, { amount: v, account, label: sg.label, entry: sg.entry, exit: sg.exit });
+    rememberRoad(sg.names, account);
+    toast(`Saved: ${sg.label} ${fmtPeso(v)} (${ACCOUNTS[account].label})`, 2000);
+    renderRouteTolls();
+  };
 }
 onWalletChange(() => state.route && renderRouteTolls());
 
@@ -1331,7 +1402,9 @@ async function handleTollTrip(trip) {
     return;
   }
   // first time on this trip: ask once
-  const guess = roadAccount(trip.names) || guessAccount(trip.names) || (getWallet().balances.easytrip != null ? 'easytrip' : 'autosweep');
+  const names = [...(state.route ? tollNamesOnRoute(state.route, trip.entry, trip.exit) : []), ...trip.names];
+  trip.names = names;
+  const guess = roadAccount(names) || guessAccount(names) || (getWallet().balances.easytrip != null ? 'easytrip' : 'autosweep');
   tollTrip = { ...trip, label, account: guess };
   $('toll-route').textContent = label;
   $('toll-amount').value = '';

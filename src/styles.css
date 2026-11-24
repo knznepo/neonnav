@@ -884,3 +884,34 @@ body.nav #dest-tolls { display: none; }
 .wal-row b { font-size: 26px; }
 .wa-bal { font-size: 26px; }
 #btn-settings { font-size: 16px; width: 34px; padding: 0; }
+
+/* per-road toll rows in the route card */
+.dt-seg { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; padding: 8px 0; border-top: 1px dashed rgba(255, 255, 255, 0.08); }
+.dt-seg .wal-badge { width: 24px; height: 24px; margin-top: 2px; }
+.dt-seg .wal-badge svg { width: 14px; height: 14px; }
+.dt-q { --acc: #9aa4b1; font: 700 13px Oswald, sans-serif; color: #c9cfd8; }
+.dt-seg-main { flex: 1; min-width: 0; }
+.dt-seg-name { font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt-seg-acc { font-size: 12px; color: var(--dim); margin-top: 1px; }
+.dt-seg-amt { flex: none; display: flex; align-items: center; gap: 6px; }
+.dt-seg-amt b { color: #fff; font-size: 15px; }
+.dt-seg-amt input {
+  width: 74px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font: 500 15px Inter, sans-serif;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.dt-seg-amt button { height: 34px; padding: 0 10px; font-size: 11px; border-radius: 4px; }
+.dt-edit { width: 30px; padding: 0 !important; font: 500 14px Inter, sans-serif !important; }
+.dt-pick { margin-top: 6px; }
+.dt-pick button { height: 30px; font-size: 11px; }
+#dest-tolls { max-height: 34vh; overflow-y: auto; }
+
+/* route card and bottom controls sit above the quick-find rail */
+#bottom { z-index: 7; }
