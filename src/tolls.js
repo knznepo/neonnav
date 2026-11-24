@@ -46,3 +46,24 @@ export function updateToll(info, pos) {
 }
 
 export const onTollRoad = () => !!onToll;
+
+/**
+ * Toll stretches along a planned route, from its road profile (speedlimit.routeLimits):
+ * [{ entry, exit, names }] for each continuous run of toll road at least 300 m long.
+ */
+export function routeTollSegments(profile) {
+  const out = [];
+  let run = null;
+  for (const p of profile || []) {
+    if (p.toll) {
+      if (!run) run = { entry: p.pt, exit: p.pt, names: [] };
+      run.exit = p.pt;
+      for (const n of p.names) if (!run.names.includes(n)) run.names.push(n);
+    } else if (run) {
+      out.push(run);
+      run = null;
+    }
+  }
+  if (run) out.push(run);
+  return out.filter((r) => dist(r.entry, r.exit) >= 300);
+}

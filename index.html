@@ -13,7 +13,7 @@
     <link rel="apple-touch-icon" href="icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=Passion+One&display=swap" rel="stylesheet" />
     <title>NeonNav</title>
   </head>
   <body class="mode-drive">
@@ -34,6 +34,7 @@
       <section id="sheet" class="panel" hidden>
         <div id="dest-name"></div>
         <div id="dest-meta"></div>
+        <div id="dest-tolls" hidden></div>
         <div class="sheet-actions">
           <button id="btn-go" class="primary">Start</button>
           <button id="btn-demo">Demo drive</button>
@@ -73,7 +74,6 @@
             <div class="legend-title">Tap the map to set a waypoint</div>
             <div class="legend-btns">
               <button id="btn-explore" aria-label="Keep exploring in the background" hidden>Background: Off</button>
-              <button id="btn-fog" aria-label="Toggle exploration fog">Fog: On</button>
               <button id="btn-settings" aria-label="Settings" title="Settings">⚙</button>
             </div>
           </div>
@@ -219,7 +219,10 @@
       </div>
       <div class="set-group">
         <div class="set-label">Exploration</div>
-        <div class="set-btns"><button id="btn-reset-explore" class="danger">Reset explored map</button></div>
+        <div class="set-btns">
+          <button id="btn-fog" aria-label="Toggle exploration fog">Fog: On</button>
+          <button id="btn-reset-explore" class="danger">Reset explored map</button>
+        </div>
       </div>
     </section>
 

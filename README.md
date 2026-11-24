@@ -114,7 +114,7 @@ After any web code change: `npm run sync` (or the android/ios scripts) to copy i
 - **Fog over unexplored areas**: a dark translucent overlay covers places you haven't been. Your
   current town or city (its OpenStreetMap boundary, via Nominatim) is revealed when the app
   starts, plus a ~450 m corridor around everywhere you actually go (real GPS only). Progress is
-  saved on the device. Turn it on or off with the **Fog** button in map view.
+  saved on the device. Turn it on or off in ⚙ Settings (map view).
 - **Gap filling**: if tracking pauses (browser hidden, screen locked, no signal) and you reappear
   somewhere else, the likely road between the two points is revealed (gaps under 30 km).
 - **Background exploration (native apps only)**: the **Background** button in map view keeps GPS
@@ -134,6 +134,11 @@ Neither provider has a public API, so balances are entered manually and kept up 
   and which account; after that the same trip is deducted automatically.
 - Optional logos: add `public/logos/easytrip.png` and `public/logos/autosweep.png` (square).
   Only use logos you have the right to use; a letter badge is shown otherwise.
+
+- **Route toll estimate**: the route card lists tolls on the planned route (amounts you've
+  confirmed before) and each balance afterwards, in red with "reload needed" if it would go negative.
+- **Balance font**: the free Passion One (Google Fonts). To use Pricedown instead, add a
+  licensed `public/fonts/pricedown.woff2` (the free Pricedown download doesn't allow web/app use).
 
 ### Backup
 

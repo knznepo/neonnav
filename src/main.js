@@ -15,7 +15,7 @@ import { getSaved, onSavedChange, getRecents, addRecent } from './saved.js';
 import { speak, stop as stopSpeech, isMuted, setMuted, spokenDistance } from './voice.js';
 import { routeLimits, limitAt, trackInfo } from './speedlimit.js';
 import { ACCOUNTS, getWallet, onWalletChange, hasAnyBalance, setBalance, addBalance, deduct, learnToll, findToll, forgetToll, rememberRoad, roadAccount, fmtPeso } from './wallet.js';
-import { updateToll, guessAccount, tripKey } from './tolls.js';
+import { updateToll, guessAccount, tripKey, routeTollSegments } from './tolls.js';
 import { saveBackup, importData } from './backup.js';
 import { resetExploration } from './fog.js';
 import { fogData, onFogChange, revealAround, revealTown, revealPath, fogEnabled, setFogEnabled } from './fog.js';
@@ -830,7 +830,19 @@ async function computeRoute(isReroute = false) {
     state.offRouteCount = 0;
     setRouteLine(r.coords);
     r.limits = null;
-    routeLimits(r.coords).then((p) => state.route === r && (r.limits = p)).catch(() => {});
+    r.tollsChecked = false;
+    renderRouteTolls();
+    routeLimits(r.coords)
+      .then((p) => {
+        if (state.route !== r) return;
+        r.limits = p;
+        r.tollsChecked = true;
+        renderRouteTolls();
+      })
+      .catch(() => {
+        r.tollsChecked = 'failed';
+        renderRouteTolls();
+      });
     state.voice = null;
     updateNav(true);
     if (isReroute) {
@@ -986,6 +998,7 @@ function clearRoute() {
   $('radar-remaining').hidden = true;
   destMarkers.forEach((mk) => mk.remove());
   setRouteLine(null);
+  $('dest-tolls').hidden = true;
   $('sheet').hidden = true;
   $('turn').hidden = true;
   $('search').hidden = false;
@@ -1122,6 +1135,11 @@ async function updateStreet() {
 }
 
 // ---------------------------------------------------------------- RFID wallet
+// Optional licensed Pricedown for the balances: used only if public/fonts/pricedown.woff2 exists.
+new FontFace('NeonMoney', `url(${new URL('fonts/pricedown.woff2', document.baseURI)})`)
+  .load()
+  .then((f) => document.fonts.add(f))
+  .catch(() => {}); // not present: the free Passion One is used
 const walletEl = $('wallet');
 function badgeHtml(acc) {
   const a = ACCOUNTS[acc];
@@ -1236,6 +1254,55 @@ function renderWalletPanel() {
     hist.appendChild(li);
   }
 }
+
+// ---------------------------------------------------------------- route toll estimate
+// Shown in the route card: tolls along the planned route (amounts you've confirmed before) and
+// what each RFID balance will be afterwards, flagged when it would go negative.
+function renderRouteTolls() {
+  const box = $('dest-tolls');
+  const r = state.route;
+  if (!r) return (box.hidden = true);
+  box.hidden = false;
+  if (r.tollsChecked === false) return (box.innerHTML = '<span class="dt-dim">Checking tolls…</span>');
+  if (r.tollsChecked === 'failed') return (box.innerHTML = '<span class="dt-dim">Toll info unavailable right now</span>');
+  const segs = routeTollSegments(r.limits);
+  if (!segs.length) return (box.innerHTML = '<span class="dt-dim">No tolls on this route</span>');
+
+  const w = getWallet();
+  const perAcc = {}; // account -> total known amount
+  const unknown = []; // account guesses for stretches without a learned amount
+  for (const seg of segs) {
+    const known = findToll(seg.entry, seg.exit, dist, 3000);
+    if (known) perAcc[known.account] = (perAcc[known.account] || 0) + known.amount;
+    else unknown.push(roadAccount(seg.names) || guessAccount(seg.names));
+  }
+  const lines = [];
+  const total = Object.values(perAcc).reduce((a, b) => a + b, 0);
+  lines.push(
+    `<div class="dt-head">Tolls: <b>${total ? fmtPeso(total) : '—'}</b>` +
+      `${unknown.length ? ` <span class="dt-dim">+ ${unknown.length} not yet known</span>` : ''}</div>`,
+  );
+  for (const [acc, amt] of Object.entries(perAcc)) {
+    const a = ACCOUNTS[acc];
+    const bal = w.balances[acc];
+    if (bal == null) {
+      lines.push(`<div class="dt-row">${badgeHtml(acc)}<span>${a.label}: ${fmtPeso(amt)} · balance not set</span></div>`);
+      continue;
+    }
+    const after = Math.round((bal - amt) * 100) / 100;
+    const neg = after < 0;
+    lines.push(
+      `<div class="dt-row${neg ? ' neg' : ''}">${badgeHtml(acc)}<span>${a.label} ${fmtPeso(bal)} → <b>${neg ? '−' + fmtPeso(-after) : fmtPeso(after)}</b>` +
+        `${neg ? ' · reload needed' : ''}</span></div>`,
+    );
+  }
+  if (unknown.length) {
+    const names = [...new Set(unknown.map((acc) => ACCOUNTS[acc]?.label || 'RFID'))].join(' / ');
+    lines.push(`<div class="dt-dim dt-note">${names} toll amount not learned yet. You'll be asked once after passing it.</div>`);
+  }
+  box.innerHTML = lines.join('');
+}
+onWalletChange(() => state.route && renderRouteTolls());
 
 // ---------------------------------------------------------------- toll trips
 let tollTrip = null;
