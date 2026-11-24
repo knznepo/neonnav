@@ -145,6 +145,14 @@ Neither provider has a public API, so balances are entered manually and kept up 
 Settings (⚙ in map view) → **Export backup** saves everything the app stores (explored map,
 saved places, RFID balances, settings) to a file; **Import backup** restores it.
 
+### Analytics
+
+Google Tag Manager container `GTM-55ZWF5SM` loads on the web and in the apps (same code), with an
+`app_platform` value (`web` / `android` / `ios`). Custom events pushed to the dataLayer:
+`navigation_start`, `demo_drive`, `search`, `quick_find` (category), `place_view` (category),
+`toll_deducted` (account, automatic). No locations, place names, search text or balances are sent.
+Users can turn it off in ⚙ Settings → Privacy (then GTM isn't loaded at all).
+
 ### Sensors and background
 
 - **Compass**: when you're stopped or walking, the arrow and map turn with the phone. iOS asks

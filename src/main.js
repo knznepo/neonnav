@@ -17,6 +17,7 @@ import { routeLimits, limitAt, trackInfo } from './speedlimit.js';
 import { ACCOUNTS, getWallet, onWalletChange, hasAnyBalance, setBalance, addBalance, deduct, learnToll, findToll, forgetToll, rememberRoad, roadAccount, fmtPeso } from './wallet.js';
 import { updateToll, guessAccount, tripKey, routeTollSegments } from './tolls.js';
 import { saveBackup, importData } from './backup.js';
+import { track, analyticsEnabled, setAnalyticsEnabled } from './analytics.js';
 import { resetExploration } from './fog.js';
 import { fogData, onFogChange, revealAround, revealTown, revealPath, fogEnabled, setFogEnabled } from './fog.js';
 
@@ -598,6 +599,7 @@ map.on('mouseenter', 'poi-blips', () => (map.getCanvas().style.cursor = 'pointer
 map.on('mouseleave', 'poi-blips', () => (map.getCanvas().style.cursor = ''));
 
 function showPlace(feature) {
+  track('place_view', { category: feature.properties?.class || 'unknown' });
   // the quick-find list hides behind the card and comes back when the card closes
   if (quickFindOpen()) setQuickFindVisible(false);
   openPlace(map, feature, {
@@ -739,6 +741,7 @@ $('q-clear').onclick = () => {
 async function runSearch(pickFirst = false) {
   const text = q.value.trim();
   if (!text) return;
+  track('search');
   const seq = ++searchSeq;
   const near = state.target || map.getCenter().toArray();
   // OpenStreetMap (Photon) and Foursquare in parallel; either can fail without breaking search
@@ -970,6 +973,7 @@ function startNav() {
   $('btn-go').hidden = true;
   $('btn-voice').hidden = false;
   $('radar-remaining').hidden = false;
+  track('navigation_start', { demo: false });
   state.voice = null;
   const r = state.route;
   speak(`Starting route to ${state.dest?.name || 'your destination'}. About ${fmtDuration(r.duration)}.`);
@@ -1082,6 +1086,7 @@ $('btn-demo').onclick = () => (state.sim ? stopSim() : startSim());
 // ---------------------------------------------------------------- demo drive
 function startSim() {
   if (!state.route) return;
+  track('demo_drive');
   if (!state.navigating) startNav();
   const r = state.route;
   state.sim = { along: snap(r.coords, r.cum, state.target).along };
@@ -1320,6 +1325,7 @@ async function handleTollTrip(trip) {
   const known = findToll(trip.entry, trip.exit, dist);
   if (known && getWallet().balances[known.account] != null) {
     deduct(known.account, known.amount, label);
+    track('toll_deducted', { account: known.account, automatic: true });
     toast(`Toll −${fmtPeso(known.amount)} ${ACCOUNTS[known.account].label} (${label})`, 4000);
     speak(`Toll of ${known.amount} pesos deducted from ${ACCOUNTS[known.account].label}.`);
     return;
@@ -1348,6 +1354,7 @@ $('toll-save').onclick = () => {
   rememberRoad(names, account);
   if (getWallet().balances[account] == null) setBalance(account, 0);
   deduct(account, amount, label);
+  track('toll_deducted', { account, automatic: false });
   toast(`Saved. ${fmtPeso(amount)} will be deducted automatically next time.`, 3000);
   tollTrip = null;
   hideCard('toll-panel');
@@ -1366,6 +1373,13 @@ $('btn-settings').onclick = () => {
 };
 $('settings-close').onclick = () => hideCard('settings-panel');
 $('btn-open-wallet').onclick = openWalletPanel;
+const analyticsLabel = () => ($('btn-analytics').textContent = `Usage stats: ${analyticsEnabled() ? 'On' : 'Off'}`);
+analyticsLabel();
+$('btn-analytics').onclick = () => {
+  setAnalyticsEnabled(!analyticsEnabled());
+  analyticsLabel();
+  toast(analyticsEnabled() ? 'Usage stats on (applies after reopening the app)' : 'Usage stats off. Nothing more will be sent.', 2500);
+};
 $('btn-export').onclick = async () => {
   try {
     const how = await saveBackup();

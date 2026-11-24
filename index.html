@@ -15,6 +15,23 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=Passion+One&display=swap" rel="stylesheet" />
     <title>NeonNav</title>
+    <!-- Google Tag Manager (GTM-55ZWF5SM). Skipped if the user turned off usage stats in Settings. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { dataLayer.push(arguments); }
+      (function () {
+        var off = false;
+        try { off = localStorage.getItem('neonnav:analytics') === '0'; } catch (e) {}
+        if (off) return;
+        var cap = window.Capacitor;
+        dataLayer.push({ app_platform: (cap && cap.getPlatform && cap.getPlatform()) || 'web' });
+        dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtm.js?id=GTM-55ZWF5SM';
+        document.head.appendChild(s);
+      })();
+    </script>
   </head>
   <body class="mode-drive">
     <div id="map"></div>
@@ -212,6 +229,11 @@
           <button id="btn-import">Import backup</button>
           <input id="import-file" type="file" accept="application/json,.json" hidden />
         </div>
+      </div>
+      <div class="set-group">
+        <div class="set-label">Privacy</div>
+        <p class="set-help">Anonymous usage stats (which features are used) help improve the app. Your location, searches and saved places are never sent.</p>
+        <div class="set-btns"><button id="btn-analytics">Usage stats: On</button></div>
       </div>
       <div class="set-group">
         <div class="set-label">RFID</div>

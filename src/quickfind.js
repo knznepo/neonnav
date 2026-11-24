@@ -5,6 +5,7 @@ import { nearbyPhoton, nearbyFoursquare } from './api.js';
 import { getSaved, getRecents, clearRecents } from './saved.js';
 import { dist } from './geo.js';
 import { fmtDist } from './format.js';
+import { track } from './analytics.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -81,6 +82,7 @@ export function closeQuickFind() {
 
 function open(cat) {
   const mySeq = ++seq;
+  track('quick_find', { category: cat.id });
   active = cat.id;
   document.querySelectorAll('.rail-btn').forEach((b) => b.classList.toggle('active', b.dataset.id === cat.id));
   const info = blipInfo(cat.blip);
