@@ -41,12 +41,28 @@ jobs:
 
       - name: Build APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          APP_VERSION_CODE: ${{ github.run_number }}
+          APP_VERSION_NAME: 1.0.${{ github.run_number }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            # Signed release build with the permanent key, so installed apps can be updated
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/neonnav.p12"
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/neonnav.p12"
+            ./gradlew assembleRelease --no-daemon
+            echo "APK_PATH=android/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_KEYSTORE_B64 secret not set: building with a throwaway debug key (installed copies can't be updated in place)"
+            ./gradlew assembleDebug --no-daemon
+            echo "APK_PATH=android/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
+          fi
 
       - name: Name the APK
         run: |
           mkdir -p out
-          cp android/app/build/outputs/apk/debug/app-debug.apk "out/NeonNav-${GITHUB_REF_NAME//\//-}.apk"
+          cp "$APK_PATH" "out/NeonNav-${GITHUB_REF_NAME//\//-}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
