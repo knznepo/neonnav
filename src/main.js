@@ -641,6 +641,14 @@ q.addEventListener('input', () => {
   searchTimer = setTimeout(runSearch, 350);
 });
 q.addEventListener('focus', () => !q.value.trim() && showSuggestions());
+
+// Hide the quick-find rail while searching so it doesn't cover the results
+function updateSearching() {
+  document.body.classList.toggle('searching', !results.hidden || document.activeElement === q);
+}
+new MutationObserver(updateSearching).observe(results, { attributes: true, attributeFilter: ['hidden'] });
+q.addEventListener('focus', updateSearching);
+q.addEventListener('blur', () => setTimeout(updateSearching, 250));
 q.addEventListener('blur', () => setTimeout(() => !q.value.trim() && (results.hidden = true), 200));
 
 // Empty search box: one-tap Home / Work / favorites and recent searches

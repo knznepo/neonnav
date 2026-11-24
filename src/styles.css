@@ -730,3 +730,6 @@ body.no-minimap #radar-wrap { display: none; }
 body.no-minimap #turn { margin-bottom: 0; border-radius: 14px; }
 #btn-minimap.off { color: var(--dim); }
 #btn-minimap.off .mm-inner { opacity: 0.25; }
+
+/* quick-find rail steps aside while the search box is in use */
+body.searching #rail { display: none; }
