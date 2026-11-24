@@ -113,23 +113,20 @@ jobs:
     needs: web
     runs-on: ubuntu-latest
     permissions:
-      pages: write
-      id-token: write
-      actions: read   # lets deploy-pages find the uploaded site artifact
-      contents: read
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      contents: write # pushes the built site to the gh-pages branch, which Pages serves
     concurrency:
       group: pages
       cancel-in-progress: true
     steps:
       - uses: actions/download-artifact@v4
         with: { name: web-dist, path: dist }
-      - uses: actions/upload-pages-artifact@v5
-        with: { path: dist }
-      - id: deploy
-        uses: actions/deploy-pages@v5
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: dist
+          publish_branch: gh-pages
+          force_orphan: true # keep only the latest site, no history bloat
+          commit_message: Deploy web version
 
   release:
     name: Publish release
