@@ -1,8 +1,10 @@
 // Cloudflare Worker that forwards Foursquare Places requests and adds your key,
 // so the key never ships inside the app. Free Cloudflare plan is enough.
 //
-// Deploy:  npx wrangler deploy worker/fsq-proxy.js --name neonnav-fsq --compatibility-date 2025-01-01
-//          npx wrangler secret put FSQ_KEY --name neonnav-fsq     (paste your Foursquare service key)
+// Deploy (from the project root):
+//   npx wrangler login
+//   npx wrangler deploy -c worker/wrangler.toml
+//   npx wrangler secret put FSQ_KEY -c worker/wrangler.toml   (paste your Foursquare service key)
 // Then build the app with VITE_FSQ_PROXY=https://neonnav-fsq.<your-subdomain>.workers.dev
 
 const ALLOWED_PARAMS = new Set(['query', 'll', 'radius', 'limit', 'fields', 'sort', 'near']);

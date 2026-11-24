@@ -1,0 +1,6 @@
+# Foursquare proxy (see fsq-proxy.js). Commands, run from the project root:
+#   npx wrangler deploy -c worker/wrangler.toml
+#   npx wrangler secret put FSQ_KEY -c worker/wrangler.toml
+name = "neonnav-fsq"
+main = "fsq-proxy.js"
+compatibility_date = "2025-01-01"
