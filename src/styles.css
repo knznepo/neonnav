@@ -718,3 +718,15 @@ body.nav #rail { display: none; }
 /* keep the map (and the result pins) visible above the list */
 #qf-panel { max-height: min(46dvh, calc(100dvh - var(--st) - var(--sb) - 90px)); }
 @media (min-width: 900px) { #qf-panel { max-height: calc(100dvh - var(--st) - var(--sb) - 110px); } }
+
+/* legend header with the exploration fog switch */
+.legend-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.legend-head .legend-title { margin-bottom: 0; }
+#btn-fog { height: 28px; padding: 0 10px; font-size: 11px; border-radius: 4px; flex: none; }
+
+/* minimap toggle */
+body.mode-map #btn-minimap { display: none; }
+body.no-minimap #radar-wrap { display: none; }
+body.no-minimap #turn { margin-bottom: 0; border-radius: 14px; }
+#btn-minimap.off { color: var(--dim); }
+#btn-minimap.off .mm-inner { opacity: 0.25; }

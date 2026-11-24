@@ -20,6 +20,11 @@
     "@capacitor/core": "^7.6.0",
     "@capacitor/geolocation": "^7.1.8",
     "@capacitor/ios": "^7.6.0",
+    "@turf/circle": "^7.4.0",
+    "@turf/difference": "^7.4.0",
+    "@turf/helpers": "^7.4.0",
+    "@turf/simplify": "^7.4.0",
+    "@turf/union": "^7.4.0",
     "maplibre-gl": "^5.24.1"
   },
   "devDependencies": {

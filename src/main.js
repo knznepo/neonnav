@@ -14,6 +14,7 @@ import { initQuickFind, closeQuickFind, quickFindOpen, setQuickFindVisible } fro
 import { getSaved, onSavedChange, getRecents, addRecent } from './saved.js';
 import { speak, stop as stopSpeech, isMuted, setMuted, spokenDistance } from './voice.js';
 import { routeLimits, limitAt, trackLimit } from './speedlimit.js';
+import { fogData, onFogChange, revealAround, revealTown, fogEnabled, setFogEnabled } from './fog.js';
 
 // Native GPS that keeps running with the screen off / app in background (used while navigating).
 const BgGeo = registerPlugin('BackgroundGeolocation');
@@ -83,6 +84,7 @@ if (import.meta.env.DEV || location.search.includes('debug')) window.neonnav = {
 for (const m of maps) {
   m.on('styleimagemissing', (e) => addMissingImage(m, e.id));
   m.on('load', () => {
+    setSource(m, 'fog', fogData());
     const r = state.route;
     setSource(m, 'route', lineData(r ? r.remaining || r.coords : null));
     applyRouteFade(m, r ? r.remaining || r.coords : null);
@@ -92,6 +94,10 @@ for (const m of maps) {
 function setSource(m, id, data) {
   m.getSource(id)?.setData(data);
 }
+onFogChange(() => {
+  const data = fogData();
+  maps.forEach((m) => setSource(m, 'fog', data));
+});
 function setRouteLine(coords) {
   maps.forEach((m) => {
     setSource(m, 'route', lineData(coords));
@@ -271,6 +277,7 @@ function handlePosition(p) {
   }
   state.lastRealFix = { coord: c, heading: h, time };
   trackSpeedLimit(c);
+  exploreAt(c);
   saveLastPos(c);
   if (state.fallback) {
     state.fallback = false;
@@ -279,6 +286,16 @@ function handlePosition(p) {
     toast('Location found', 1500);
   }
   if (!state.sim) onFix(c, h, spd);
+}
+
+// Exploration fog: reveal your town once per session, then a corridor wherever you go.
+let townRevealed = false;
+function exploreAt(c) {
+  if (!townRevealed) {
+    townRevealed = true;
+    revealTown(c).then((name) => name && toast(`Exploring ${name}`, 2000));
+  }
+  revealAround(c);
 }
 
 function handleLocationError(err) {
@@ -936,6 +953,34 @@ function showSheet() {
   $('search').hidden = false;
 }
 
+// Minimap toggle (remembered on this device)
+const MINIMAP_KEY = 'neonnav:minimap';
+let showMinimap = true;
+try {
+  showMinimap = localStorage.getItem(MINIMAP_KEY) !== '0';
+} catch { /* ignore */ }
+function applyMinimap() {
+  document.body.classList.toggle('no-minimap', !showMinimap);
+  $('btn-minimap').classList.toggle('off', !showMinimap);
+  if (showMinimap) setTimeout(() => radar.resize(), 0); // it was hidden, so re-measure
+  state.needsRender = true;
+}
+$('btn-minimap').onclick = () => {
+  showMinimap = !showMinimap;
+  try {
+    localStorage.setItem(MINIMAP_KEY, showMinimap ? '1' : '0');
+  } catch { /* ignore */ }
+  applyMinimap();
+  toast(showMinimap ? 'Minimap on' : 'Minimap off', 1200);
+};
+applyMinimap();
+
+$('btn-fog').textContent = `Fog: ${fogEnabled() ? 'On' : 'Off'}`;
+$('btn-fog').onclick = () => {
+  setFogEnabled(!fogEnabled());
+  $('btn-fog').textContent = `Fog: ${fogEnabled() ? 'On' : 'Off'}`;
+};
+
 $('btn-voice').classList.toggle('muted', isMuted());
 $('btn-voice').onclick = () => {
   setMuted(!isMuted());
@@ -991,7 +1036,8 @@ async function updateStreet() {
   }
   const now = Date.now();
   const last = state.street;
-  if (now - last.t < 20000 && last.pos && dist(last.pos, state.target) < 60) return;
+  // at most every 15 s, and only after moving 60 m (Photon is a shared free server)
+  if (now - last.t < 15000 || (last.pos && dist(last.pos, state.target) < 60)) return;
   last.t = now;
   last.pos = state.target;
   try {

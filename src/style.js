@@ -112,6 +112,22 @@ export function buildStyle({ radar = false } = {}) {
     roadLayer('road-motorway', inClass('motorway'), C.motorway, width(5, 0.6 * r, 14, 4 * r, 18, 28 * r)),
     roadLayer('rail', inClass('rail'), C.rail, width(12, 0.5, 18, 3), { dash: [3, 3] }),
 
+    // Exploration fog over unvisited areas (data set at runtime by fog.js). A wide blurred line
+    // along the fog's border softens the edge into the revealed area.
+    {
+      id: 'fog-fill', type: 'fill', source: 'fog',
+      paint: { 'fill-color': '#05081c', 'fill-opacity': 0.74 },
+    },
+    {
+      id: 'fog-edge', type: 'line', source: 'fog',
+      layout: { 'line-join': 'round' },
+      paint: {
+        'line-color': '#05081c',
+        'line-opacity': 0.55,
+        'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 8, 10, 12, 30, 16, 90],
+        'line-blur': ['interpolate', ['exponential', 1.5], ['zoom'], 8, 10, 12, 30, 16, 90],
+      },
+    },
     // GPS route (data set at runtime): a pink band with lighter edges. The fade near the
     // player is applied at runtime with a line-gradient (see routeGradient in main.js).
     {
@@ -183,6 +199,7 @@ export function buildStyle({ radar = false } = {}) {
     sources: {
       omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
       route: { type: 'geojson', data: EMPTY, lineMetrics: true }, // lineMetrics enables line-gradient
+      fog: { type: 'geojson', data: EMPTY, tolerance: 0.6 },
     },
     layers,
   };

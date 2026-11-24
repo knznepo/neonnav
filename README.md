@@ -109,6 +109,14 @@ After any web code change: `npm run sync` (or the android/ios scripts) to copy i
   They get their own pins and appear in the empty search box with your recent searches.
   Stored on the device only.
 
+### Exploration fog and minimap
+
+- **Fog over unexplored areas**: a dark translucent overlay covers places you haven't been. Your
+  current town or city (its OpenStreetMap boundary, via Nominatim) is revealed when the app
+  starts, plus a ~450 m corridor around everywhere you actually go (real GPS only). Progress is
+  saved on the device. Turn it on or off with the **Fog** button in map view.
+- **Minimap toggle**: the minimap button (drive view) shows or hides the minimap; remembered.
+
 ### Sensors and background
 
 - **Compass**: when you're stopped or walking, the arrow and map turn with the phone. iOS asks
