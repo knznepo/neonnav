@@ -523,7 +523,7 @@ async function runSearch(pickFirst = false) {
   const [osm, fsq] = await Promise.allSettled([searchPlaces(text, near), searchFoursquare(text, near)]);
   const osmItems = osm.status === 'fulfilled' ? osm.value : [];
   const fsqItems = fsq.status === 'fulfilled' ? fsq.value : [];
-  let items = mergeResults(fsqItems, osmItems);
+  let items = mergeResults(fsqItems, osmItems, near);
   if (!items.length && osm.status === 'rejected' && fsq.status === 'rejected') items = null;
   if (seq !== searchSeq) return;
   if (pickFirst && items?.length) return choose(items[0]);

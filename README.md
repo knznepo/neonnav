@@ -113,7 +113,10 @@ address. Only the cheaper "Pro" fields are requested.
      in `.env.local` and as the `FSQ_PROXY` repository secret for the GitHub APK build.
 3. Rebuild (`npm run build`, or push to GitHub for a new APK).
 
-Without either setting, the app works exactly as before using OpenStreetMap only.
+This project's builds use the proxy at `https://neonnav-fsq.neonnavapp.workers.dev` by default
+(the Foursquare key is stored there as the `FSQ_KEY` secret and never ships in the app).
+Set `VITE_FSQ_PROXY=` (empty) to turn Foursquare off; if the proxy fails, search falls back to
+OpenStreetMap only.
 
 ## Customising the look
 

@@ -217,8 +217,11 @@ function stripHtml(html) {
 // Configure ONE of these at build time (see README):
 //   VITE_FSQ_PROXY = URL of your proxy that adds the key (safe for shared builds)
 //   VITE_FSQ_KEY   = Foursquare service key (personal builds only; it ends up inside the app)
-const FSQ_KEY = import.meta.env.VITE_FSQ_KEY;
-const FSQ_PROXY = import.meta.env.VITE_FSQ_PROXY;
+// The public proxy is the default (it holds the key server-side). Set VITE_FSQ_PROXY='' to turn
+// Foursquare off, or point it at your own proxy.
+const FSQ_PROXY = import.meta.env.VITE_FSQ_PROXY ?? 'https://neonnav-fsq.neonnavapp.workers.dev';
+// A raw key is only used when there's no proxy; the build then drops it from the bundle entirely.
+const FSQ_KEY = import.meta.env.VITE_FSQ_PROXY === '' ? import.meta.env.VITE_FSQ_KEY : undefined;
 export const foursquareEnabled = Boolean(FSQ_KEY || FSQ_PROXY);
 // "Pro" fields only; hours/rating/photos are pricier "Premium" fields.
 const FSQ_FIELDS = 'fsq_place_id,name,categories,location,latitude,longitude,distance,tel,website';
@@ -234,10 +237,13 @@ async function fsq(path, params) {
   return res.json();
 }
 
+// Some Foursquare names contain literal escape sequences like "\u0026" (&)
+const unescape = (str) => (str || '').replace(/\\u([0-9a-f]{4})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
+
 function fsqItem(r) {
   const loc = r.location || {};
   return {
-    name: r.name,
+    name: unescape(r.name),
     sub: [r.categories?.[0]?.name, loc.formatted_address || [loc.address, loc.locality].filter(Boolean).join(', ')]
       .filter(Boolean)
       .join(' · '),
@@ -277,10 +283,12 @@ export async function foursquareMatch(name, coord) {
 }
 
 /** Foursquare results first (better business coverage), then OSM, without near-duplicates. */
-export function mergeResults(primary, secondary, max = 8) {
+export function mergeResults(primary, secondary, near, max = 8) {
   const out = [];
   const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  for (const it of [...primary, ...secondary]) {
+  // with local business results available, drop far-away OSM matches (e.g. a town called "Coffee")
+  const local = primary.length && near ? secondary.filter((it) => haversine(it.coord, near) < 100000) : secondary;
+  for (const it of [...primary, ...local]) {
     // same name within 250 m = same place (sources often pin a venue at different spots)
     const dup = out.some((o) => norm(o.name) === norm(it.name) && haversine(o.coord, it.coord) < 250);
     if (!dup) out.push(it);

@@ -110,9 +110,10 @@ function loadDetails(name, coord, mySeq) {
 function renderDetails(t, rev, stillLoading, fsq) {
   const rows = [];
   const street = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
-  const address = street
-    ? [street, t['addr:city']].filter(Boolean).join(', ')
-    : fsq?.location?.formatted_address || rev?.address;
+  let fromFsq = false; // only credit Foursquare when it actually supplied something shown
+  const fsqAddress = fsq?.location?.formatted_address;
+  const address = street ? [street, t['addr:city']].filter(Boolean).join(', ') : fsqAddress || rev?.address;
+  if (!street && fsqAddress) fromFsq = true;
   if (address) rows.push(['pin', address]);
 
   const hours = t.opening_hours;
@@ -126,9 +127,13 @@ function renderDetails(t, rev, stillLoading, fsq) {
       badge.hidden = false;
     }
   }
-  const phone = t.phone || t['contact:phone'] || fsq?.tel;
+  const osmPhone = t.phone || t['contact:phone'];
+  const phone = osmPhone || fsq?.tel;
+  if (!osmPhone && fsq?.tel) fromFsq = true;
   if (phone) rows.push(['phone', phone]);
-  const web = t.website || t['contact:website'] || fsq?.website;
+  const osmWeb = t.website || t['contact:website'];
+  const web = osmWeb || fsq?.website;
+  if (!osmWeb && fsq?.website) fromFsq = true;
   if (web) rows.push(['globe', web.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')]);
   const extra = [t.cuisine && titleCase(t.cuisine.replace(/;/g, ', ')), t.brand || t.operator].filter(Boolean).join(' · ');
   if (extra) rows.push(['tag', extra]);
@@ -159,7 +164,7 @@ function renderDetails(t, rev, stillLoading, fsq) {
     list.appendChild(li);
   }
   if (stillLoading) list.insertAdjacentHTML('beforeend', '<li class="loading"><span></span></li>');
-  if (fsq && !stillLoading) list.insertAdjacentHTML('beforeend', '<li class="credit">Some details from Foursquare</li>');
+  if (fromFsq && !stillLoading) list.insertAdjacentHTML('beforeend', '<li class="credit">Some details from Foursquare</li>');
   if (phone) {
     $('place-call').href = `tel:${phone.split(';')[0].replace(/\s/g, '')}`;
     $('place-call').hidden = false;
