@@ -3,7 +3,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './styles.css';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
-import { buildStyle } from './style.js';
+import { buildStyle, COLORS } from './style.js';
 import { addMissingImage, legendItems } from './icons.js';
 import { searchPlaces, searchFoursquare, mergeResults, getRoute, reverseGeocode } from './api.js';
 import { dist, bearing, cumulative, snap, pointAt, lerpAngle, angleDiff } from './geo.js';
@@ -81,6 +81,7 @@ for (const m of maps) {
   m.on('load', () => {
     const r = state.route;
     setSource(m, 'route', lineData(r ? r.remaining || r.coords : null));
+    applyRouteFade(m, r ? r.remaining || r.coords : null);
   });
 }
 
@@ -88,7 +89,25 @@ function setSource(m, id, data) {
   m.getSource(id)?.setData(data);
 }
 function setRouteLine(coords) {
-  maps.forEach((m) => setSource(m, 'route', lineData(coords)));
+  maps.forEach((m) => {
+    setSource(m, 'route', lineData(coords));
+    applyRouteFade(m, coords);
+  });
+}
+
+// The route starts at the player, so line-progress 0 is right at the arrow. Fade the first
+// ~130 m in from transparent; the fraction is recomputed as the remaining route gets shorter.
+const ROUTE_FADE_M = 130;
+function routeGradient(color, coords) {
+  const len = coords && coords.length > 1 ? cumulative(coords).at(-1) : 0;
+  const f = len > 0 ? Math.min(0.9, Math.max(0.001, ROUTE_FADE_M / len)) : 0.5;
+  const rgb = color.match(/\w\w/g).map((h) => parseInt(h, 16)).join(',');
+  return ['interpolate', ['linear'], ['line-progress'], 0, `rgba(${rgb},0)`, f, `rgba(${rgb},1)`, 1, `rgba(${rgb},1)`];
+}
+function applyRouteFade(m, coords) {
+  if (!m.getLayer('route-line')) return;
+  m.setPaintProperty('route-line', 'line-gradient', routeGradient(COLORS.route, coords));
+  m.setPaintProperty('route-casing', 'line-gradient', routeGradient(COLORS.routeEdge, coords));
 }
 function lineData(coords) {
   return coords && coords.length > 1
@@ -98,7 +117,7 @@ function lineData(coords) {
 
 // ---------------------------------------------------------------- markers
 const PLAYER_SVG = '<div class="beam"></div><svg viewBox="0 0 64 64"><path d="M32 5 55 57 32 45 9 57z" fill="#fff" stroke="#0b0d10" stroke-width="5" stroke-linejoin="round"/></svg>';
-const DEST_SVG = '<svg viewBox="0 0 34 44"><path d="M17 42C17 42 3 26 3 16a14 14 0 0 1 28 0c0 10-14 26-14 26z" fill="#ffcc00" stroke="#0b0d10" stroke-width="3"/><circle cx="17" cy="16" r="5" fill="#0b0d10"/></svg>';
+const DEST_SVG = '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#ff5fb4" stroke="#0b0d10" stroke-width="3.5"/></svg>';
 
 function el(cls, html) {
   const d = document.createElement('div');
@@ -112,8 +131,8 @@ const playerMarkers = [
   new maplibregl.Marker({ element: el('player small', PLAYER_SVG), rotationAlignment: 'map', pitchAlignment: 'map' }),
 ];
 const destMarkers = [
-  new maplibregl.Marker({ element: el('dest', DEST_SVG), anchor: 'bottom' }),
-  new maplibregl.Marker({ element: el('dest small', DEST_SVG), anchor: 'bottom' }),
+  new maplibregl.Marker({ element: el('dest', DEST_SVG), anchor: 'center' }),
+  new maplibregl.Marker({ element: el('dest small', DEST_SVG), anchor: 'center' }),
 ];
 
 // ---------------------------------------------------------------- location
@@ -366,7 +385,7 @@ function updateRadarOverlay() {
   if (Math.hypot(dx, dy) < r - 12) return (edge.hidden = true);
   const a = (Math.atan2(dx, -dy) * 180) / Math.PI;
   edge.hidden = false;
-  edge.style.transform = `rotate(${a}deg) translateY(${-(r - 10)}px) rotate(${-a}deg) rotate(45deg)`;
+  edge.style.transform = `rotate(${a}deg) translateY(${-(r - 10)}px) rotate(${-a}deg)`;
 }
 
 // ---------------------------------------------------------------- modes

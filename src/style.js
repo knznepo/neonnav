@@ -20,8 +20,8 @@ export const COLORS = {
   label: '#e8ecf1',
   labelDim: '#9aa4b1',
   halo: '#0b0d10',
-  route: '#d63cff',
-  routeGlow: '#a100ff',
+  route: '#ff5fb4',      // pink route band
+  routeEdge: '#ffe2f1',  // light edge lines along both sides
 };
 
 const C = COLORS;
@@ -112,16 +112,17 @@ export function buildStyle({ radar = false } = {}) {
     roadLayer('road-motorway', inClass('motorway'), C.motorway, width(5, 0.6 * r, 14, 4 * r, 18, 28 * r)),
     roadLayer('rail', inClass('rail'), C.rail, width(12, 0.5, 18, 3), { dash: [3, 3] }),
 
-    // GPS route (data set at runtime)
+    // GPS route (data set at runtime): a pink band with lighter edges. The fade near the
+    // player is applied at runtime with a line-gradient (see routeGradient in main.js).
     {
-      id: 'route-glow', type: 'line', source: 'route',
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': C.routeGlow, 'line-width': width(10, 8 * r, 18, 34 * r), 'line-blur': 8, 'line-opacity': 0.55 },
+      id: 'route-casing', type: 'line', source: 'route',
+      layout: { 'line-cap': 'butt', 'line-join': 'round' },
+      paint: { 'line-color': C.routeEdge, 'line-width': width(10, 6.5 * r, 14, 12 * r, 18, 31 * r) },
     },
     {
       id: 'route-line', type: 'line', source: 'route',
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': C.route, 'line-width': width(10, 3.5 * r, 18, 14 * r) },
+      layout: { 'line-cap': 'butt', 'line-join': 'round' },
+      paint: { 'line-color': C.route, 'line-width': width(10, 4 * r, 14, 8 * r, 18, 25 * r) },
     },
   ];
 
@@ -180,7 +181,7 @@ export function buildStyle({ radar = false } = {}) {
     glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources: {
       omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
-      route: { type: 'geojson', data: EMPTY },
+      route: { type: 'geojson', data: EMPTY, lineMetrics: true }, // lineMetrics enables line-gradient
     },
     layers,
   };
