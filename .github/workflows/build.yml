@@ -115,6 +115,8 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      actions: read   # lets deploy-pages find the uploaded site artifact
+      contents: read
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
