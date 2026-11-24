@@ -13,7 +13,11 @@ import { openPlace, closePlace, placeOpen } from './place.js';
 import { initQuickFind, closeQuickFind, quickFindOpen, setQuickFindVisible } from './quickfind.js';
 import { getSaved, onSavedChange, getRecents, addRecent } from './saved.js';
 import { speak, stop as stopSpeech, isMuted, setMuted, spokenDistance } from './voice.js';
-import { routeLimits, limitAt, trackLimit } from './speedlimit.js';
+import { routeLimits, limitAt, trackInfo } from './speedlimit.js';
+import { ACCOUNTS, getWallet, onWalletChange, hasAnyBalance, setBalance, addBalance, deduct, learnToll, findToll, forgetToll, rememberRoad, roadAccount, fmtPeso } from './wallet.js';
+import { updateToll, guessAccount, tripKey } from './tolls.js';
+import { saveBackup, importData } from './backup.js';
+import { resetExploration } from './fog.js';
 import { fogData, onFogChange, revealAround, revealTown, revealPath, fogEnabled, setFogEnabled } from './fog.js';
 
 // Native GPS that keeps running with the screen off / app in background (used while navigating).
@@ -301,7 +305,7 @@ function handlePosition(p) {
     h = compassHeading() ?? travelBearing;
   }
   state.lastRealFix = { coord: c, heading: h, time };
-  trackSpeedLimit(c);
+  trackRoad(c);
   if (prev && !state.fallback) fillGap(prev, c, time, p.coords.accuracy);
   exploreAt(c);
   saveLastPos(c);
@@ -454,15 +458,24 @@ function updateLimit(now) {
   sign.hidden = false;
 }
 
-function trackSpeedLimit(coord) {
+// Every ~15 s while moving, look up the road you're on: its speed limit (used when there's no
+// route) and whether it's a toll road (for automatic toll deductions).
+function trackRoad(coord) {
   const t = (state.track ||= []);
   if (!t.length || dist(t[t.length - 1], coord) > 10) t.push(coord);
   if (t.length > 8) t.shift();
-  if (state.route || state.speed < 4 || t.length < 3) return;
-  if (Date.now() - (state.lastFreeLookup || 0) < 15000) return;
-  state.lastFreeLookup = Date.now();
-  trackLimit(t.slice(-6))
-    .then((kmh) => (state.freeLimit = { kmh, t: Date.now(), pos: coord }))
+  if (state.speed < 4 || t.length < 3) return;
+  if (Date.now() - (state.lastRoadLookup || 0) < 15000) return;
+  state.lastRoadLookup = Date.now();
+  trackInfo(t.slice(-6))
+    .then((info) => {
+      if (!info) return;
+      if (!state.route) state.freeLimit = { kmh: info.kmh, t: Date.now(), pos: coord };
+      if (hasAnyBalance()) {
+        const trip = updateToll(info, coord);
+        if (trip) handleTollTrip(trip);
+      }
+    })
     .catch(() => {});
 }
 
@@ -1107,6 +1120,211 @@ async function updateStreet() {
     /* offline: keep previous label */
   }
 }
+
+// ---------------------------------------------------------------- RFID wallet
+const walletEl = $('wallet');
+function badgeHtml(acc) {
+  const a = ACCOUNTS[acc];
+  // try the logo image; fall back to a letter badge if it isn't there
+  return `<span class="wal-badge" style="--acc:${a.color}"><img src="${a.logo}" alt="" onerror="this.remove()">${a.badge}</span>`;
+}
+const shown = {}; // currently displayed amounts, for the count animation
+function renderWallet(change) {
+  const w = getWallet();
+  walletEl.innerHTML = '';
+  for (const acc of Object.keys(ACCOUNTS)) {
+    const bal = w.balances[acc];
+    if (bal == null) continue;
+    const row = document.createElement('button');
+    row.className = 'wal-row';
+    row.dataset.acc = acc;
+    row.setAttribute('aria-label', `${ACCOUNTS[acc].label} balance`);
+    row.innerHTML = `<b></b>${badgeHtml(acc)}`;
+    row.onclick = openWalletPanel;
+    walletEl.appendChild(row);
+    const b = row.querySelector('b');
+    const from = shown[acc] ?? bal;
+    shown[acc] = bal;
+    if (change?.account === acc && change.delta && from !== bal) {
+      row.classList.add(change.delta < 0 ? 'down' : 'up');
+      const t0 = performance.now();
+      const tick = (now) => {
+        const k = Math.min(1, (now - t0) / 700);
+        b.textContent = fmtPeso(Math.round((from + (bal - from) * k) * 100) / 100);
+        if (k < 1) requestAnimationFrame(tick);
+        else setTimeout(() => row.classList.remove('down', 'up'), 900);
+      };
+      requestAnimationFrame(tick);
+    } else {
+      b.textContent = fmtPeso(bal);
+    }
+  }
+  if (!hasAnyBalance()) {
+    walletEl.innerHTML = '<button class="wal-add">+ RFID balance</button>';
+    walletEl.firstChild.onclick = openWalletPanel;
+  }
+  if (!$('wallet-panel').hidden) renderWalletPanel();
+}
+onWalletChange((w, change) => renderWallet(change));
+renderWallet();
+
+function showCard(id) {
+  const el = $(id);
+  el.hidden = false;
+  requestAnimationFrame(() => el.classList.add('show'));
+}
+function hideCard(id) {
+  const el = $(id);
+  el.classList.remove('show');
+  setTimeout(() => !el.classList.contains('show') && (el.hidden = true), 200);
+}
+
+function openWalletPanel() {
+  closePlace();
+  hideCard('settings-panel');
+  renderWalletPanel();
+  showCard('wallet-panel');
+}
+$('wallet-close').onclick = () => hideCard('wallet-panel');
+
+function renderWalletPanel() {
+  const w = getWallet();
+  const box = $('wallet-accounts');
+  box.innerHTML = '';
+  for (const [acc, a] of Object.entries(ACCOUNTS)) {
+    const div = document.createElement('div');
+    div.className = 'wa';
+    div.style.setProperty('--acc', a.color);
+    div.innerHTML = `
+      <div class="wa-head">${badgeHtml(acc)}<b>${a.label}</b><span class="wa-bal">${fmtPeso(w.balances[acc])}</span></div>
+      <div class="wa-row"><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="Set exact balance (₱)"><button data-act="set">Set</button></div>
+      <div class="wa-row">${[100, 200, 500, 1000].map((v) => `<button class="wa-quick" data-act="add" data-v="${v}">+${v}</button>`).join('')}</div>`;
+    div.onclick = (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      if (btn.dataset.act === 'set') {
+        const v = div.querySelector('input').value;
+        if (v === '') return toast('Enter an amount first', 1500);
+        setBalance(acc, v);
+        toast(`${a.label} balance set to ${fmtPeso(Number(v))}`, 1800);
+      } else if (btn.dataset.act === 'add') {
+        if (w.balances[acc] == null) return toast(`Set your ${a.label} balance first`, 1800);
+        addBalance(acc, Number(btn.dataset.v), 'Reload');
+        toast(`Added ₱${btn.dataset.v} to ${a.label}`, 1500);
+      }
+    };
+    box.appendChild(div);
+  }
+  const tolls = $('wallet-tolls');
+  const entries = Object.entries(w.tolls);
+  tolls.innerHTML = entries.length ? '' : '<li class="empty">None yet. After a toll road trip you\'ll be asked for the amount once.</li>';
+  for (const [key, t] of entries) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="wp-text"></span><span class="wp-amt"></span><button class="wp-del" aria-label="Forget">✕</button>`;
+    li.querySelector('.wp-text').textContent = `${t.label} · ${ACCOUNTS[t.account]?.label || ''}`;
+    li.querySelector('.wp-amt').textContent = fmtPeso(t.amount);
+    li.querySelector('.wp-del').onclick = () => forgetToll(key);
+    tolls.appendChild(li);
+  }
+  const hist = $('wallet-history');
+  hist.innerHTML = w.history.length ? '' : '<li class="empty">No activity yet.</li>';
+  for (const h of w.history.slice(0, 8)) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="wp-text"></span><span class="wp-amt ${h.delta < 0 ? 'neg' : 'pos'}"></span>`;
+    li.querySelector('.wp-text').textContent = `${ACCOUNTS[h.account]?.label}: ${h.note} · ${new Date(h.t).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+    li.querySelector('.wp-amt').textContent = `${h.delta < 0 ? '−' : '+'}${fmtPeso(Math.abs(h.delta))}`;
+    hist.appendChild(li);
+  }
+}
+
+// ---------------------------------------------------------------- toll trips
+let tollTrip = null;
+async function placeLabel(coord) {
+  try {
+    const r = await reverseGeocode(coord);
+    return r?.name || r?.street || 'Unknown';
+  } catch {
+    return 'Unknown';
+  }
+}
+async function handleTollTrip(trip) {
+  const [from, to] = await Promise.all([placeLabel(trip.entry), placeLabel(trip.exit)]);
+  const label = `${from} → ${to}`;
+  const known = findToll(trip.entry, trip.exit, dist);
+  if (known && getWallet().balances[known.account] != null) {
+    deduct(known.account, known.amount, label);
+    toast(`Toll −${fmtPeso(known.amount)} ${ACCOUNTS[known.account].label} (${label})`, 4000);
+    speak(`Toll of ${known.amount} pesos deducted from ${ACCOUNTS[known.account].label}.`);
+    return;
+  }
+  // first time on this trip: ask once
+  const guess = roadAccount(trip.names) || guessAccount(trip.names) || (getWallet().balances.easytrip != null ? 'easytrip' : 'autosweep');
+  tollTrip = { ...trip, label, account: guess };
+  $('toll-route').textContent = label;
+  $('toll-amount').value = '';
+  setTollAccount(guess);
+  showCard('toll-panel');
+}
+function setTollAccount(acc) {
+  tollTrip.account = acc;
+  document.querySelectorAll('#toll-acc button').forEach((b) => b.classList.toggle('on', b.dataset.acc === acc));
+}
+$('toll-acc').onclick = (e) => {
+  const b = e.target.closest('button');
+  if (b && tollTrip) setTollAccount(b.dataset.acc);
+};
+$('toll-save').onclick = () => {
+  const amount = Number($('toll-amount').value);
+  if (!tollTrip || !(amount > 0)) return toast('Enter the toll amount', 1500);
+  const { entry, exit, label, account, names } = tollTrip;
+  learnToll(tripKey(entry, exit), { amount, account, label, entry, exit });
+  rememberRoad(names, account);
+  if (getWallet().balances[account] == null) setBalance(account, 0);
+  deduct(account, amount, label);
+  toast(`Saved. ${fmtPeso(amount)} will be deducted automatically next time.`, 3000);
+  tollTrip = null;
+  hideCard('toll-panel');
+};
+const skipToll = () => {
+  tollTrip = null;
+  hideCard('toll-panel');
+};
+$('toll-skip').onclick = skipToll;
+$('toll-close').onclick = skipToll;
+
+// ---------------------------------------------------------------- settings + backup
+$('btn-settings').onclick = () => {
+  hideCard('wallet-panel');
+  showCard('settings-panel');
+};
+$('settings-close').onclick = () => hideCard('settings-panel');
+$('btn-open-wallet').onclick = openWalletPanel;
+$('btn-export').onclick = async () => {
+  try {
+    const how = await saveBackup();
+    if (how !== 'cancelled') toast(how === 'copied' ? 'Backup copied to the clipboard. Paste it into a note or file to keep it.' : 'Backup saved', 3000);
+  } catch {
+    toast('Could not create the backup', 2500);
+  }
+};
+$('btn-import').onclick = () => $('import-file').click();
+$('import-file').onchange = async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const n = importData(await file.text());
+    toast(`Restored ${n} items. Reloading…`, 1500);
+    setTimeout(() => location.reload(), 1200);
+  } catch (err) {
+    toast(err.message || 'That file could not be read', 3000);
+  }
+};
+$('btn-reset-explore').onclick = () => {
+  if (!confirm('Reset your explored map? The fog will cover everything except your current town again.')) return;
+  resetExploration();
+  toast('Explored map reset', 1500);
+};
 
 // ---------------------------------------------------------------- misc UI
 let toastTimer = null;

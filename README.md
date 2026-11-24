@@ -123,6 +123,23 @@ After any web code change: `npm run sync` (or the android/ios scripts) to copy i
   on the web keep the app open on screen while driving.
 - **Minimap toggle**: the minimap button (drive view) shows or hides the minimap; remembered.
 
+### RFID toll balances (Easytrip, Autosweep)
+
+Neither provider has a public API, so balances are entered manually and kept up to date by the app:
+
+- Balances show in the top-right corner (tap to manage: set exact amount, quick reloads, history).
+- While you drive, the app checks every ~15 s whether you're on a toll road (OpenStreetMap data via
+  Valhalla). When you leave one, it deducts the toll for that entry→exit trip.
+- The first time on a trip it asks for the amount once (from your receipt or the provider's SMS)
+  and which account; after that the same trip is deducted automatically.
+- Optional logos: add `public/logos/easytrip.png` and `public/logos/autosweep.png` (square).
+  Only use logos you have the right to use; a letter badge is shown otherwise.
+
+### Backup
+
+Settings (⚙ in map view) → **Export backup** saves everything the app stores (explored map,
+saved places, RFID balances, settings) to a file; **Import backup** restores it.
+
 ### Sensors and background
 
 - **Compass**: when you're stopped or walking, the arrow and map turn with the phone. iOS asks

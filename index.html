@@ -74,6 +74,7 @@
             <div class="legend-btns">
               <button id="btn-explore" aria-label="Keep exploring in the background" hidden>Background: Off</button>
               <button id="btn-fog" aria-label="Toggle exploration fog">Fog: On</button>
+              <button id="btn-settings" aria-label="Settings" title="Settings">⚙</button>
             </div>
           </div>
           <ul id="legend-list"></ul>
@@ -153,6 +154,74 @@
       <a id="viewer-credit" target="_blank" rel="noopener"></a>
       <button id="viewer-close" class="icon-btn" aria-label="Close photo">✕</button>
     </div>
+
+    <!-- RFID balances, top-right -->
+    <div id="wallet"></div>
+
+    <section id="wallet-panel" hidden>
+      <div class="pc-head">
+        <div class="pc-titles">
+          <h2>RFID balances</h2>
+          <div class="pc-sub"><span>Tolls are deducted automatically when you leave a toll road</span></div>
+        </div>
+        <button id="wallet-close" class="pc-close" aria-label="Close">✕</button>
+      </div>
+      <div id="wallet-accounts"></div>
+      <div class="wp-section">Saved toll trips</div>
+      <ul id="wallet-tolls" class="wp-list"></ul>
+      <div class="wp-section">Recent</div>
+      <ul id="wallet-history" class="wp-list"></ul>
+    </section>
+
+    <section id="toll-panel" hidden>
+      <div class="pc-head">
+        <div class="pc-avatar toll-avatar">₱</div>
+        <div class="pc-titles">
+          <h2>Toll trip</h2>
+          <div class="pc-sub"><span id="toll-route"></span></div>
+        </div>
+        <button id="toll-close" class="pc-close" aria-label="Close">✕</button>
+      </div>
+      <p class="toll-q">How much was the toll? It'll be remembered and deducted automatically next time.</p>
+      <div class="toll-form">
+        <input id="toll-amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Amount (₱)" />
+        <div class="seg" id="toll-acc">
+          <button data-acc="easytrip">Easytrip</button>
+          <button data-acc="autosweep">Autosweep</button>
+        </div>
+      </div>
+      <div class="place-actions">
+        <button id="toll-save" class="primary">Deduct &amp; remember</button>
+        <button id="toll-skip">Skip</button>
+      </div>
+    </section>
+
+    <section id="settings-panel" hidden>
+      <div class="pc-head">
+        <div class="pc-titles">
+          <h2>Settings</h2>
+          <div class="pc-sub"><span>Everything is stored on this device</span></div>
+        </div>
+        <button id="settings-close" class="pc-close" aria-label="Close">✕</button>
+      </div>
+      <div class="set-group">
+        <div class="set-label">Backup</div>
+        <p class="set-help">Save your explored map, saved places, RFID balances and settings to a file, or restore them on this or another phone.</p>
+        <div class="set-btns">
+          <button id="btn-export">Export backup</button>
+          <button id="btn-import">Import backup</button>
+          <input id="import-file" type="file" accept="application/json,.json" hidden />
+        </div>
+      </div>
+      <div class="set-group">
+        <div class="set-label">RFID</div>
+        <div class="set-btns"><button id="btn-open-wallet">Manage balances</button></div>
+      </div>
+      <div class="set-group">
+        <div class="set-label">Exploration</div>
+        <div class="set-btns"><button id="btn-reset-explore" class="danger">Reset explored map</button></div>
+      </div>
+    </section>
 
     <div id="toast" class="panel" hidden></div>
     <script type="module" src="/src/main.js"></script>

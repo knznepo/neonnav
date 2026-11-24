@@ -451,7 +451,7 @@ body.nav .sheet-actions .icon-btn { width: 38px; }
 #place-info li.credit { padding: 6px 0 2px; border-top: 0; }
 
 /* ---------- notification-style cards (place details + quick find results) ---------- */
-#place, #qf-panel {
+#place, #qf-panel, #wallet-panel, #toll-panel, #settings-panel {
   --cat: #d63cff;
   position: fixed;
   z-index: 8;
@@ -472,9 +472,9 @@ body.nav .sheet-actions .icon-btn { width: 38px; }
   opacity: 0;
   transition: transform 0.2s ease-out, opacity 0.2s ease-out;
 }
-#place.show, #qf-panel.show { transform: none; opacity: 1; }
+#place.show, #qf-panel.show, #wallet-panel.show, #toll-panel.show, #settings-panel.show { transform: none; opacity: 1; }
 @media (min-width: 900px) {
-  #place, #qf-panel { top: calc(var(--st) + 80px); bottom: auto; left: calc(var(--sl) + 76px); right: auto; width: 420px; }
+  #place, #qf-panel, #wallet-panel, #toll-panel, #settings-panel { top: calc(var(--st) + 80px); bottom: auto; left: calc(var(--sl) + 76px); right: auto; width: 420px; }
 }
 .pc-head { display: flex; align-items: center; gap: 12px; padding: 14px 12px 6px 14px; }
 .pc-avatar {
@@ -723,7 +723,7 @@ body.nav #rail { display: none; }
 .legend-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .legend-head .legend-title { margin-bottom: 0; }
 .legend-btns { display: flex; gap: 6px; flex: none; }
-#btn-fog, #btn-explore { height: 28px; padding: 0 10px; font-size: 11px; border-radius: 4px; flex: none; }
+#btn-fog, #btn-explore, #btn-settings { height: 28px; padding: 0 10px; font-size: 11px; border-radius: 4px; flex: none; }
 .legend-head { flex-wrap: wrap; }
 
 /* minimap toggle */
@@ -735,3 +735,120 @@ body.no-minimap #turn { margin-bottom: 0; border-radius: 14px; }
 
 /* quick-find rail steps aside while the search box is in use */
 body.searching #rail { display: none; }
+
+/* ---------- RFID balances (top-right) ---------- */
+#wallet {
+  position: fixed;
+  z-index: 6;
+  top: calc(var(--st) + 78px);
+  right: calc(var(--sr) + 14px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+body.nav #wallet { top: calc(var(--st) + 86px); }
+body.searching #wallet { display: none; }
+.wal-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.wal-row b {
+  font: 700 21px/1 Oswald, sans-serif;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55), 0 0 8px rgba(0, 0, 0, 0.6);
+  transition: color 0.3s;
+}
+.wal-row.down b { color: #ff6b77; }
+.wal-row.up b { color: #4be38b; }
+.wal-badge {
+  --acc: #fff;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font: 700 12px/1 Oswald, sans-serif;
+  color: var(--acc);
+  background: rgba(10, 11, 20, 0.75);
+  border: 2px solid var(--acc);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.wal-add {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  background: rgba(16, 17, 34, 0.85);
+}
+body.mode-drive .wal-add { display: none; }
+/* attribution (i) moves below the balances */
+.maplibregl-ctrl-top-right { top: calc(var(--st) + 150px); }
+
+/* wallet panel */
+.wa { --acc: #fff; margin: 6px 14px 0; padding: 12px; border-radius: 4px; background: rgba(255, 255, 255, 0.04); border-left: 3px solid var(--acc); }
+.wa-head { display: flex; align-items: center; gap: 8px; }
+.wa-head b { font: 600 15px Inter, sans-serif; flex: 1; }
+.wa-bal { font: 700 22px/1 Oswald, sans-serif; color: #fff; }
+.wa-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.wa-row input, .toll-form input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font: 500 16px Inter, sans-serif;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.wa-row button { height: 40px; padding: 0 12px; font-size: 12px; border-radius: 4px; }
+.wa-row .wa-quick { flex: 1; }
+.wp-section {
+  margin: 14px 14px 4px;
+  font: 600 11px Oswald, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.wp-list { list-style: none; margin: 0; padding: 0 14px 10px; }
+.wp-list li { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 13px; color: #d4d8e3; }
+.wp-list li + li { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.wp-list .wp-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-list .wp-amt { font-weight: 600; flex: none; }
+.wp-list .wp-amt.neg { color: #ff8a95; }
+.wp-list .wp-amt.pos { color: #4be38b; }
+.wp-list .wp-del { width: 28px; height: 28px; padding: 0; border-radius: 4px; font: 500 13px Inter, sans-serif; flex: none; }
+.wp-list .empty { color: var(--dim); }
+
+/* toll prompt */
+.toll-avatar { font: 700 26px Oswald, sans-serif; color: #fff; }
+.toll-q { margin: 4px 14px 10px; font-size: 14px; color: #d4d8e3; line-height: 1.4; }
+.toll-form { display: flex; flex-direction: column; gap: 8px; padding: 0 14px; }
+.seg { display: flex; gap: 6px; }
+.seg button { flex: 1; height: 40px; border-radius: 4px; font-size: 12px; }
+.seg button.on { background: var(--accent); border-color: transparent; }
+
+/* settings */
+.set-group { margin: 8px 14px 4px; padding: 10px 0; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.set-label { font: 600 11px Oswald, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.set-help { margin: 6px 0 0; font-size: 13px; color: #c9cedb; line-height: 1.4; }
+.set-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.set-btns button { height: 40px; border-radius: 4px; font-size: 12px; }
+.set-btns button.danger { color: #ff8a95; }
+#settings-panel { padding-bottom: 10px; }
+
+/* optional logo image inside the badge (covers the letter when present) */
+.wal-badge { position: relative; overflow: hidden; }
+.wal-badge img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; background: #fff; }

@@ -1,4 +1,4 @@
-// Road speed limits from OpenStreetMap via the free Valhalla service (FOSSGIS).
+// Road speed limits and toll-road detection from OpenStreetMap via the free Valhalla service (FOSSGIS).
 //  - While navigating: one lookup for the whole route.
 //  - While driving without a route: a lookup of your recent track every ~15 s.
 import { dist } from './geo.js';
@@ -13,18 +13,22 @@ async function trace(points) {
       shape: points.map(([lon, lat]) => ({ lat, lon })),
       costing: 'auto',
       shape_match: 'map_snap',
-      filters: { attributes: ['edge.speed_limit', 'edge.begin_shape_index', 'edge.end_shape_index', 'shape'], action: 'include' },
+      filters: {
+        attributes: ['edge.speed_limit', 'edge.toll', 'edge.names', 'edge.road_class', 'edge.begin_shape_index', 'edge.end_shape_index', 'shape'],
+        action: 'include',
+      },
     }),
   });
   if (!res.ok) throw new Error('speed limit lookup failed');
   const j = await res.json();
   const shape = decodePolyline6(j.shape || '');
-  // one entry per matched shape point: the limit (km/h) of the edge it belongs to
-  const limits = new Array(shape.length).fill(null);
+  // one entry per matched shape point, with the attributes of the edge it belongs to
+  const info = new Array(shape.length).fill(null);
   for (const e of j.edges || []) {
-    for (let i = e.begin_shape_index; i <= e.end_shape_index && i < shape.length; i++) limits[i] = e.speed_limit ?? limits[i];
+    const v = { kmh: e.speed_limit ?? null, toll: !!e.toll, names: e.names || [], roadClass: e.road_class };
+    for (let i = e.begin_shape_index; i <= e.end_shape_index && i < shape.length; i++) info[i] = v;
   }
-  return shape.map((pt, i) => ({ pt, kmh: limits[i] }));
+  return shape.map((pt, i) => ({ pt, kmh: info[i]?.kmh ?? null, toll: info[i]?.toll ?? false, names: info[i]?.names ?? [], roadClass: info[i]?.roadClass }));
 }
 
 /** Thin a line to at most `max` points, at least `minGap` metres apart. */
@@ -60,12 +64,15 @@ export function limitAt(profile, pos) {
   return best ? best.kmh : null;
 }
 
-/** Limit (km/h) on the road at the end of a recent GPS track, or null. */
-export async function trackLimit(track) {
+/** The road at the end of a recent GPS track: { kmh, toll, names } (kmh may be null). */
+export async function trackInfo(track) {
   if (!track || track.length < 2) return null;
   const profile = await trace(track);
-  for (let i = profile.length - 1; i >= 0; i--) if (profile[i].kmh) return profile[i].kmh;
-  return null;
+  if (!profile.length) return null;
+  const last = profile[profile.length - 1];
+  let kmh = null;
+  for (let i = profile.length - 1; i >= 0 && kmh == null; i--) kmh = profile[i].kmh;
+  return { kmh, toll: last.toll, names: last.names };
 }
 
 function decodePolyline6(str) {

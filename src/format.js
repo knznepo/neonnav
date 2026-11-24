@@ -1,6 +1,5 @@
-// Units follow the device locale: miles/mph for US, UK, Liberia, Myanmar; metric elsewhere.
-const lang = (navigator.language || 'en-US').toUpperCase();
-export const IMPERIAL = /-(US|GB|LR|MM)$/.test(lang) || lang === 'EN';
+// Distances in km/m and speeds in km/h everywhere.
+export const IMPERIAL = false;
 
 export function fmtDist(m) {
   if (IMPERIAL) {
