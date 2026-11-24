@@ -2,10 +2,23 @@
 // Stored on this device only.
 const KEY = 'neonnav:wallet';
 
-// logo: optional image in public/logos/ (add your own); a letter badge is shown until it exists.
+// Colours sampled from the reference design. glyph = original icon drawn for this app;
+// logo = optional image in public/logos/ that replaces the glyph if you add one.
 export const ACCOUNTS = {
-  easytrip: { label: 'Easytrip', badge: 'E', color: '#19b394', logo: 'logos/easytrip.png' },
-  autosweep: { label: 'Autosweep', badge: 'A', color: '#7b5cff', logo: 'logos/autosweep.png' },
+  easytrip: {
+    label: 'Easytrip',
+    color: '#b18cda',
+    logo: 'logos/easytrip.png',
+    // three "fast lane" speed lines forming an E
+    glyph: '<path d="M7 6.5h10M7 12h7.5M7 17.5h10M7 6.5v11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  },
+  autosweep: {
+    label: 'Autosweep',
+    color: '#69c979',
+    logo: 'logos/autosweep.png',
+    // a sweeping arc with an arrowhead
+    glyph: '<path d="M17.5 8.5A6.5 6.5 0 1 0 18.5 13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M14.2 8.6h3.6V5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  },
 };
 
 const blank = () => ({

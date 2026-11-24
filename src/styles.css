@@ -852,3 +852,12 @@ body.mode-drive .wal-add { display: none; }
 /* optional logo image inside the badge (covers the letter when present) */
 .wal-badge { position: relative; overflow: hidden; }
 .wal-badge img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; background: #fff; }
+
+/* account badge: dark disc, coloured ring and icon (as in the reference design) */
+.wal-badge { width: 26px; height: 26px; border-width: 2px; background: #15132a; }
+.wal-badge svg { width: 16px; height: 16px; color: var(--acc); }
+.wa-head .wal-badge { width: 30px; height: 30px; }
+.wa-head .wal-badge svg { width: 18px; height: 18px; }
+/* toll prompt: selected account in its own colour */
+.seg button[data-acc='easytrip'].on { background: #b18cda; color: #15132a; }
+.seg button[data-acc='autosweep'].on { background: #69c979; color: #0f2014; }

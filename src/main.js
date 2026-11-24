@@ -1126,7 +1126,7 @@ const walletEl = $('wallet');
 function badgeHtml(acc) {
   const a = ACCOUNTS[acc];
   // try the logo image; fall back to a letter badge if it isn't there
-  return `<span class="wal-badge" style="--acc:${a.color}"><img src="${a.logo}" alt="" onerror="this.remove()">${a.badge}</span>`;
+  return `<span class="wal-badge" style="--acc:${a.color}"><svg viewBox="0 0 24 24" aria-hidden="true">${a.glyph}</svg><img src="${a.logo}" alt="" onerror="this.remove()"></span>`;
 }
 const shown = {}; // currently displayed amounts, for the count animation
 function renderWallet(change) {
