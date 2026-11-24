@@ -45,6 +45,11 @@ npm run build        # outputs dist/
 Upload `dist/` to any static host (Netlify, Vercel, Cloudflare Pages, GitHub Pages).
 On the phone, open the site, then **Add to Home Screen** (iOS Safari) or **Install app** (Android Chrome).
 
+## Web version
+
+Live at **https://knznepo.github.io/neonnav/** (redeployed automatically on every push to `main`).
+On a phone, open it and use *Add to Home Screen* (iPhone Safari) or *Install app* (Android Chrome).
+
 ## Download builds (no tools needed)
 
 GitHub builds both apps on every push (`.github/workflows/build.yml`):
