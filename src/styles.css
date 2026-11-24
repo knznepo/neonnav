@@ -175,8 +175,9 @@ button.primary {
   background: rgba(16, 17, 30, 0.94);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
 }
-#turn + #radar-wrap { border-top-left-radius: 0; border-top-right-radius: 0; }
-#turn + #radar-wrap #radar { border-top-left-radius: 0; border-top-right-radius: 0; }
+/* square top corners only while the turn panel is attached above */
+#turn:not([hidden]) + #radar-wrap { border-top-left-radius: 0; border-top-right-radius: 0; }
+#turn:not([hidden]) + #radar-wrap #radar { border-top-left-radius: 0; border-top-right-radius: 0; }
 .turn-body { flex: 1; min-width: 0; padding: 8px 12px; }
 #turn-title {
   font: 700 18px/1.15 Oswald, sans-serif;
